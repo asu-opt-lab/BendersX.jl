@@ -127,11 +127,11 @@ user_callback = NoUserCallback()
 # BendersBnB
 # -----------------------------------------------------------------------------
 env = BendersBnB(
-    master,
-    preprocessing,
-    lazy_callback,
-    user_callback;
-    param = benders_param
+    master;
+    preprocessing = preprocessing,
+    lazy_callback = lazy_callback,
+    user_callback = user_callback,
+    param = benders_param,
 )
 
 # -----------------------------------------------------------------------------

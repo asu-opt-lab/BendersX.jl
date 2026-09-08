@@ -172,10 +172,10 @@ lazy_callback = LazyCallback(lazy_oracle)
 user_callback = UserCallback(disjunctive_oracle; param = UserCallbackParam(frequency = frequency))
 
 env = BendersBnB(
-    master,
-    preprocessing,
-    lazy_callback,
-    user_callback;
+    master;
+    preprocessing = preprocessing,
+    lazy_callback = lazy_callback,
+    user_callback = user_callback,
     param = benders_param,
 )
 

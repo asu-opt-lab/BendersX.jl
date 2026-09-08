@@ -279,7 +279,7 @@ end
     @test occursin("GLPK", solver_name(oracle.model))
 end
 
-@testset "model keyword accepts model-update functions and unconstrained data types" begin
+@testset "model keyword, unconstrained data types, and revised constructors" begin
     struct ModelKeywordData
         n_facilities::Int
         n_customers::Int
@@ -325,13 +325,45 @@ end
     unified = UnifiedOracle(data, master; model = keyword_subproblem_model!, optimizer = optimizer)
     pareto = ParetoOracle(data, master, ParetoOracleParam(fill(0.5, data.n_facilities)); model = keyword_subproblem_model!, optimizer = optimizer)
     separable = SeparableOracle(data, master, ClassicalOracle, 1; model = keyword_subproblem_model!, optimizer = optimizer)
+    explicit_separable = SeparableOracle(master, [classical])
     knapsack = CFLKnapsackOracle(data, master; model = keyword_subproblem_model!, optimizer = optimizer)
+
+    preprocessing = NoPreprocessing()
+    lazy_callback = LazyCallback(classical)
+    user_callback = UserCallback(unified)
+    bnb_param = BendersBnBParam(time_limit = 10.0, verbose = false)
+    explicit_bnb = BendersBnB(
+        master;
+        lazy_callback = lazy_callback,
+        preprocessing = preprocessing,
+        user_callback = user_callback,
+        param = bnb_param,
+    )
+    convenience_bnb = BendersBnB(
+        master,
+        classical;
+        preprocessing = preprocessing,
+        param = bnb_param,
+    )
 
     @test classical.model isa Model
     @test unified.model isa Model
     @test pareto.model isa Model
     @test length(separable.oracles) == 1
+    @test explicit_separable.oracles == [classical]
     @test knapsack.model isa Model
+
+    @test explicit_bnb.master === master
+    @test explicit_bnb.lazy_callback === lazy_callback
+    @test explicit_bnb.preprocessing === preprocessing
+    @test explicit_bnb.user_callback === user_callback
+    @test explicit_bnb.param === bnb_param
+
+    @test convenience_bnb.master === master
+    @test convenience_bnb.lazy_callback.oracle === classical
+    @test convenience_bnb.preprocessing === preprocessing
+    @test convenience_bnb.user_callback isa NoUserCallback
+    @test convenience_bnb.param === bnb_param
 
 end
 
