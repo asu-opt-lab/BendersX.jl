@@ -99,7 +99,7 @@ function add_normalization_constraint!(
     sx::AbstractVector{VariableRef},
     st::AbstractVector{VariableRef},
 )
-    initialize_reverse_polar!(normalization, master)
+    initialize_reverse_polar!(normalization, length(sx), length(st))
 
     @constraint(dcglp, con_reverse_polar_x[j in eachindex(sx)], sx[j] + 0.0 * tau == 0.0)
     @constraint(dcglp, con_reverse_polar_t[j in eachindex(st)], st[j] + 0.0 * tau == 0.0)
@@ -107,21 +107,25 @@ function add_normalization_constraint!(
     return nothing
 end
 
-function initialize_reverse_polar!(normalization::ReversePolarNormalization, master::AbstractMaster)
+function initialize_reverse_polar!(
+    normalization::ReversePolarNormalization,
+    dim_x::Int,
+    dim_t::Int,
+)
     if normalization.use_core_point
-        check_reverse_polar_dimension(normalization.core_point_x, master.dim_x, "core_point_x")
-        check_reverse_polar_dimension(normalization.core_point_t, master.dim_t, "core_point_t")
+        check_reverse_polar_dimension(normalization.core_point_x, dim_x, "core_point_x")
+        check_reverse_polar_dimension(normalization.core_point_t, dim_t, "core_point_t")
         return nothing
     end
 
     if normalization.core_direction_x === nothing && normalization.core_direction_t === nothing
-        normalization.core_direction_x = zeros(master.dim_x)
-        normalization.core_direction_t = ones(master.dim_t)
+        normalization.core_direction_x = zeros(dim_x)
+        normalization.core_direction_t = ones(dim_t)
         return nothing
     end
 
-    check_reverse_polar_dimension(normalization.core_direction_x, master.dim_x, "core_direction_x")
-    check_reverse_polar_dimension(normalization.core_direction_t, master.dim_t, "core_direction_t")
+    check_reverse_polar_dimension(normalization.core_direction_x, dim_x, "core_direction_x")
+    check_reverse_polar_dimension(normalization.core_direction_t, dim_t, "core_direction_t")
     return nothing
 end
 

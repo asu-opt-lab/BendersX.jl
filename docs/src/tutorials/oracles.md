@@ -95,8 +95,35 @@ oracle = SeparableOracle(
 )
 ```
 
-Any oracle whose concrete type `T <: AbstractTypicalOracle` implements the
+Any oracle whose concrete type `T <: AbstractOracle` implements the
 required constructor interface can be used as the template.
+
+`SeparableOracle` can also wrap explicitly constructed oracles, including
+disjunctive oracles. A per-scenario split construction gives every scenario
+its own one-dimensional DCGLP:
+
+```julia
+split_oracles = [
+    begin
+        kappa = ClassicalOracle(data, master; scen_idx = j)
+        nu = ClassicalOracle(data, master; scen_idx = j)
+        SplitOracle(
+            master,
+            (kappa, nu);
+            dim_t = 1,
+            param = deepcopy(split_param),
+        )
+    end
+    for j in 1:N
+]
+
+oracle = SeparableOracle(master, split_oracles)
+```
+
+Each child must consume one local `t` value, return exactly one scenario
+objective value, and produce cuts with a one-dimensional `a_t`. The wrapper
+copies each returned cut before embedding its `a_t` coefficient at the
+corresponding global scenario index, so child cut histories remain local.
 
 !!! note
     `SeparableOracle` evaluates subproblems with Julia threads. The default GLPK
@@ -149,6 +176,16 @@ oracle = SplitOracle(
 The DCGLP optimizer can be configured through the standard JuMP
 `optimizer_with_attributes` interface, as shown above. `oracle_kappa` and `oracle_nu`
 can be any typical oracles that are compatible with the subproblem.
+
+These two composition orders have different meanings:
+
+- `SplitOracle(Separable typical oracles)` builds one global DCGLP, so a cut
+  may involve several `t[j]` components.
+- `SeparableOracle(per-scenario SplitOracles)` builds one local DCGLP per
+  scenario, so every generated cut acts only on that scenario's `t[j]`.
+
+For a local split oracle, pass `dim_t = 1`. Omitting `dim_t` preserves the
+usual global behavior and defaults to `master.dim_t`.
 
 ### Configuring `SplitOracle` Behavior
 

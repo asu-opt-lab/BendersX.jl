@@ -7,6 +7,7 @@ using BendersX
     include("test_callback_metadata.jl")
     include("test_preprocessing.jl")
     include("test_disjunctive_norm_oracles.jl")
+    include("test_separable_oracle.jl")
     include("test_scalarize_constraints.jl")
     include("test_validate_LP.jl")
     include("test_interface.jl")

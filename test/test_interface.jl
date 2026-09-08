@@ -397,7 +397,7 @@ end
     @test f_x == [1.0, 1.0]
     @test all(occursin("HiGHS", solver_name(suboracle.model)) for suboracle in oracle.oracles)
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(BendersX.TimeLimitException("test timeout")),
         SeparableInterruptionTestOracle(nothing),
     ]
@@ -410,7 +410,7 @@ end
     @test timeout_error isa BendersX.TimeLimitException
     @test timeout_error.msg == "test timeout"
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(nothing),
         SeparableInterruptionTestOracle(BendersX.UnexpectedModelStatusException("test status")),
     ]
@@ -423,7 +423,7 @@ end
     @test status_error isa BendersX.UnexpectedModelStatusException
     @test status_error.msg == "test status"
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(ArgumentError("test generic error")),
         SeparableInterruptionTestOracle(nothing),
     ]

@@ -40,6 +40,17 @@ function generate_cuts(oracle::AbstractOracle, x_value::Vector{Float64}, t_value
     throw(UnimplementedInterfaceException("update generate_cuts for $(typeof(oracle))"))
 end
 
+# Internal role trait used by composite oracles. Unlike Julia's type hierarchy,
+# this can classify an oracle from the roles of its children.
+abstract type OracleRole end
+struct TypicalRole <: OracleRole end
+struct DisjunctiveRole <: OracleRole end
+struct MixedRole <: OracleRole end
+
+oracle_role(::AbstractOracle) = MixedRole()
+oracle_role(::AbstractTypicalOracle) = TypicalRole()
+oracle_role(::AbstractDisjunctiveOracle) = DisjunctiveRole()
+
 # ---------------------------------------------------------------------------- 
 # Basic oracle parameters
 # ----------------------------------------------------------------------------
@@ -70,3 +81,4 @@ end
 # ----------------------------------------------------------------------------
 include("oracleTypical.jl")
 include("oracleDisjunctive.jl")
+include("oracleSeparable.jl")

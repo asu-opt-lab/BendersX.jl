@@ -6,16 +6,16 @@ Two-phase preprocessing that first runs a typical
 oracle-based separation and then a disjunctive oracle separation to
 produce stronger initial cuts.
 # Fields
-- `typical_oracle::AbstractTypicalOracle`: Oracle for the first phase (classical preprocessing)
-- `disjunctive_oracle::AbstractDisjunctiveOracle`: Oracle for the second phase
+- `typical_oracle::AbstractOracle`: Oracle with a typical role for the first phase (classical preprocessing)
+- `disjunctive_oracle::AbstractOracle`: Oracle with a disjunctive role for the second phase
 - `seq_env_type::Type{<:AbstractBendersSeq}`: Type of sequential Benders algorithm to use
 - `param::AbstractBendersSeqParam`: Parameters for the sequential algorithm
 
 # Constructor
 ```julia
 DisjunctiveLPRelaxationPreprocessing(
-    typical_oracle::AbstractTypicalOracle,
-    disjunctive_oracle::AbstractDisjunctiveOracle;
+    typical_oracle::AbstractOracle,
+    disjunctive_oracle::AbstractOracle;
     seq_env_type::Type{<:AbstractBendersSeq} = BendersSeq,
     param::AbstractBendersSeqParam = BendersSeqParam()
 )
@@ -30,17 +30,27 @@ env = BendersBnB(master, preprocessing, lazy_callback, user_callback)
 See also: [`LPRelaxationPreprocessing`](@ref), [`AbstractDisjunctiveOracle`](@ref)
 """
 mutable struct DisjunctiveLPRelaxationPreprocessing <: AbstractPreprocessing
-    typical_oracle::AbstractTypicalOracle
-    disjunctive_oracle::AbstractDisjunctiveOracle
+    typical_oracle::AbstractOracle
+    disjunctive_oracle::AbstractOracle
     seq_env_type::Type{<:AbstractBendersSeq}
     param::AbstractBendersSeqParam
 
     function DisjunctiveLPRelaxationPreprocessing(
-        typical_oracle::AbstractTypicalOracle,
-        disjunctive_oracle::AbstractDisjunctiveOracle;
+        typical_oracle::AbstractOracle,
+        disjunctive_oracle::AbstractOracle;
         seq_env_type::Type{<:AbstractBendersSeq} = BendersSeq,
         param::AbstractBendersSeqParam = BendersSeqParam()
     )
+        oracle_role(typical_oracle) isa TypicalRole || throw(
+            ArgumentError(
+                "DisjunctiveLPRelaxationPreprocessing: the first oracle must have a typical role.",
+            ),
+        )
+        oracle_role(disjunctive_oracle) isa DisjunctiveRole || throw(
+            ArgumentError(
+                "DisjunctiveLPRelaxationPreprocessing: the second oracle must have a disjunctive role.",
+            ),
+        )
         new(typical_oracle, disjunctive_oracle, seq_env_type, param)
     end
 end

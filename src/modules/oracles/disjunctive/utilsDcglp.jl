@@ -4,11 +4,14 @@
         master::AbstractMaster,
         normalization::AbstractNormalization,
         param::SplitOracleParam,
+        ; dim_t = master.dim_t,
     )
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
 The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization constraint defined by `normalization`.
+`dim_t` controls the auxiliary-variable dimension of the DCGLP and defaults to
+the master's full `t` dimension.
 
 Returns the constructed JuMP model.
 """
@@ -16,8 +19,10 @@ function build_dcglp(
     master::AbstractMaster,
     normalization::AbstractNormalization,
     param::SplitOracleParam,
+    ;
+    dim_t::Int = master.dim_t,
 )
-    dcglp, tau, sx, st = build_dcglp_base(master, param)
+    dcglp, tau, sx, st = build_dcglp_base(master, param; dim_t = dim_t)
 
     add_normalization_constraint!(normalization, master, dcglp, tau, sx, st)
 
@@ -28,6 +33,7 @@ end
     build_dcglp_base(
         master::AbstractMaster,
         param::SplitOracleParam,
+        ; dim_t = master.dim_t,
     )
 
 Build the common DCGLP formulation shared by all normalization schemes.
@@ -44,12 +50,15 @@ variables required to define its normalization.
 function build_dcglp_base(
     master::AbstractMaster,
     param::SplitOracleParam,
+    ;
+    dim_t::Int = master.dim_t,
 )
+    dim_t > 0 || throw(ArgumentError("build_dcglp_base: `dim_t` must be positive."))
     dcglp = Model(param.dcglp_param.optimizer)
     @variable(dcglp, omega_0[1:2] >= 0)
 
     @variable(dcglp, omega_x[1:2, 1:master.dim_x])
-    @variable(dcglp, omega_t[1:2, 1:master.dim_t])
+    @variable(dcglp, omega_t[1:2, 1:dim_t])
 
     @constraint(dcglp, [i in 1:2], omega_t[i, :] .>= -1.0e6 .* omega_0[i])
     @constraint(dcglp, coneta[i in 1:2, j in 1:master.dim_x], 0 >= -omega_0[i] + omega_x[i, j])
@@ -69,12 +78,12 @@ function build_dcglp_base(
 
     @variable(dcglp, tau)
     @variable(dcglp, sx[1:master.dim_x])
-    @variable(dcglp, st[1:master.dim_t])
+    @variable(dcglp, st[1:dim_t])
 
     @objective(dcglp, Min, tau)
 
     @constraint(dcglp, conx, dcglp[:omega_x][1, :] + dcglp[:omega_x][2, :] - sx .== 0)
-    @constraint(dcglp, cont[j = 1:master.dim_t], dcglp[:omega_t][1, j] + dcglp[:omega_t][2, j] - st[j] == 0)
+    @constraint(dcglp, cont[j = 1:dim_t], dcglp[:omega_t][1, j] + dcglp[:omega_t][2, j] - st[j] == 0)
 
     return dcglp, tau, sx, st
 end
