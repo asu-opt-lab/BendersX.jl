@@ -3,8 +3,7 @@
 
 Parameters controlling [`SplitOracle`](@ref).
 
-`SplitOracleParam` contains settings for the split/disjunctive procedure. The
-normalization algorithm is configured directly on [`SplitOracle`](@ref).
+`SplitOracleParam` contains `dcglp_param`, which configures the DCGLP solution process, and settings for the split procedure. The normalization scheme is configured directly on [`SplitOracle`](@ref).
 
 # Fields
 
@@ -34,8 +33,7 @@ normalization algorithm is configured directly on [`SplitOracle`](@ref).
         zero_tol = 1e-9,
     )
 
-Construct split-oracle parameters with configurable DCGLP, split-selection,
-cut-append, and cut-generation settings.
+Construct split-oracle parameters with configurable DCGLP, split-selection, cut-append, and cut-generation settings.
 """
 mutable struct SplitOracleParam <: AbstractOracleParam
     dcglp_param::DcglpParam
@@ -97,10 +95,7 @@ end
 
 Split-based disjunctive Benders oracle.
 
-`SplitOracle` uses a split disjunction and a DCGLP to generate disjunctive
-Benders cuts. The normalization scheme is a direct subcomponent of the oracle,
-while the remaining procedure settings are specified through
-[`SplitOracleParam`](@ref).
+`SplitOracle` uses a split disjunction and a DCGLP to generate disjunctive Benders cuts. The normalization scheme is a direct subcomponent of the oracle, while the remaining split-procedure configuration is specified through [`SplitOracleParam`](@ref).
 
 # Fields
 
@@ -124,8 +119,7 @@ while the remaining procedure settings are specified through
     T2<:AbstractTypicalOracle,
 }
 
-Construct a split oracle using two typical Benders oracles, a normalization
-algorithm, and the specified split-oracle configuration.
+Construct a split oracle using two typical Benders oracles, a normalization scheme, and the specified split-oracle configuration.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
 """
@@ -182,8 +176,7 @@ end
 
 Generate disjunctive Benders cuts for a candidate master solution.
 
-The method selects a split, updates the DCGLP for the candidate solution, and
-solves the resulting DCGLP using `oracle.normalization`.
+The method selects a split, uses `oracle.normalization` to update the DCGLP for the candidate solution, and then solves the resulting DCGLP.
 
 If the configured normalization requires fallback separation, or if disjunctive cut generation encounters an error and `oracle.param.fallback_to_typical_cuts` is `true`, the first typical oracle is used to generate typical Benders cuts.
 

@@ -113,8 +113,8 @@ For mixed-integer master problems, BendersX provides the
 Dual Cut Generating Linear Program (DCGLP).
 
 A `SplitOracle` is constructed by combining two *typical* oracles (denoted by
-`κ` and `ν`) with a normalization component and a `SplitOracleParam`. The
-parameter object controls the split/disjunctive procedure and contains a
+`κ` and `ν`) with a normalization scheme and a `SplitOracleParam`. The
+parameter object controls the split procedure and contains a
 [`DcglpParam`](@ref) for the DCGLP solution process.
 
 ```julia
@@ -150,7 +150,7 @@ Attach the solver for the DCGLP through standard JuMP APIs such as `optimizer_wi
 The component oracles `oracle_kappa` and `oracle_nu` can be any implementation of typical oracles compatible with the underlying problem.
 
 ### Configuring `SplitOracle` Behavior
-The normalization algorithm is selected directly on `SplitOracle`: use
+The normalization scheme is selected directly on `SplitOracle`: use
 `LpDistanceNormalization(p)` for an ``L_p``-distance normalization or
 `ReversePolarNormalization(...)` for reverse-polar scaling. The remaining
 behavior is controlled through `SplitOracleParam`. Key options include:

@@ -8,8 +8,7 @@
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
-The method first constructs the common DCGLP formulation through
-`build_dcglp_base`, then adds the constraint defined by `normalization`.
+The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization constraint defined by `normalization`.
 
 Returns the constructed JuMP model.
 """
