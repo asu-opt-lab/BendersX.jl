@@ -128,7 +128,6 @@ dcglp_param = DcglpParam(;
 )
 
 oracle_param = SplitOracleParam(;
-    normalization = ReversePolarNormalization(),
     dcglp_param = dcglp_param,
     split_index_selection_rule = LargestFractional(),
     disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -153,7 +152,12 @@ typical_oracles = (
         param = UFLKnapsackOracleParam(add_only_violated_cuts = true),
     ),
 )
-disjunctive_oracle = SplitOracle(master, typical_oracles; param = oracle_param)
+disjunctive_oracle = SplitOracle(
+    master,
+    typical_oracles;
+    normalization = ReversePolarNormalization(),
+    param = oracle_param,
+)
 
 lazy_oracle = UFLKnapsackOracle(
     data;

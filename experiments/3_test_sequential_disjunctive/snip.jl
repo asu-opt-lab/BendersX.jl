@@ -42,7 +42,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                         @info "solving SNIP instance$instance snipno $snipno budget $budget - disjunctive oracle/classical - seq - strgthnd $strengthened; benders2master $add_benders_cuts_to_master reuse $reuse_dcglp p $p lift $lift dcut_append $disjunctive_cut_append_rule"
                         @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
 
-                            oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                            oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = LargestFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -55,7 +55,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             typical_oracle_kappa = SeparableOracle(data, master, ClassicalOracle, data.num_scenarios; model = update_sub_model!, optimizer = optimizer)
                             typical_oracle_nu = SeparableOracle(data, master, ClassicalOracle, data.num_scenarios; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [typical_oracle_kappa; typical_oracle_nu]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
                             env = BendersSeq(master, disjunctive_oracle; param = benders_param)
 
                             log = solve!(env)
@@ -72,7 +72,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                         @info "solving SNIP instance$instance snipno $snipno budget $budget - disjunctive oracle/pareto - seq - strgthnd $strengthened; benders2master $add_benders_cuts_to_master reuse $reuse_dcglp p $p lift $lift dcut_append $disjunctive_cut_append_rule"
                         @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
 
-                            oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                            oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = LargestFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -86,7 +86,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             typical_oracle_kappa = SeparableOracle(data, master, ParetoOracle, data.num_scenarios; model = update_sub_model!, sub_oracle_param = pareto_param, optimizer = optimizer)
                             typical_oracle_nu = SeparableOracle(data, master, ParetoOracle, data.num_scenarios; model = update_sub_model!, sub_oracle_param = pareto_param, optimizer = optimizer)
                             typical_oracles = [typical_oracle_kappa; typical_oracle_nu]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
                             env = BendersSeq(master, disjunctive_oracle; param = benders_param)
 
                             log = solve!(env)
@@ -103,7 +103,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                         @info "solving SNIP instance$instance snipno $snipno budget $budget - disjunctive oracle/unified - seq - strgthnd $strengthened; benders2master $add_benders_cuts_to_master reuse $reuse_dcglp p $p lift $lift dcut_append $disjunctive_cut_append_rule"
                         @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
 
-                            oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                            oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = LargestFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -117,7 +117,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             typical_oracle_kappa = SeparableOracle(data, master, UnifiedOracle, data.num_scenarios; model = update_sub_model!, sub_oracle_param = unified_param, optimizer = optimizer)
                             typical_oracle_nu = SeparableOracle(data, master, UnifiedOracle, data.num_scenarios; model = update_sub_model!, sub_oracle_param = unified_param, optimizer = optimizer)
                             typical_oracles = [typical_oracle_kappa; typical_oracle_nu]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
                             env = BendersSeq(master, disjunctive_oracle; param = benders_param)
 
                             log = solve!(env)

@@ -200,8 +200,9 @@ end
 
     @testset "parameter validation" begin
         dcglp_param = disjunctive_norm_dcglp_param()
-        @test_throws ArgumentError SplitOracleParam(; normalization = LpDistanceNormalization(), dcglp_param = dcglp_param, add_benders_cuts_to_master = 3)
-        @test_throws ArgumentError SplitOracleParam(; normalization = ReversePolarNormalization(), dcglp_param = dcglp_param, fraction_of_benders_cuts_to_master = 1.1)
+        @test_throws ArgumentError SplitOracleParam(; dcglp_param = dcglp_param, add_benders_cuts_to_master = 3)
+        @test_throws ArgumentError SplitOracleParam(; dcglp_param = dcglp_param, fraction_of_benders_cuts_to_master = 1.1)
+        @test_throws MethodError SplitOracleParam(; normalization = LpDistanceNormalization())
         @test_throws ArgumentError ReversePolarNormalization(; core_point_x = Float64[], core_point_t = [0.0])
         @test_throws ArgumentError ReversePolarNormalization(; core_point_x = [0.0])
         @test_throws ArgumentError ReversePolarNormalization(; core_direction_x = [0.0])
@@ -225,45 +226,36 @@ end
         @test default_reverse_polar.core_direction_t === nothing
         @test !default_reverse_polar.use_core_point
 
-        disjunctive_norm_param = LpDistanceNormalization(1.0)
+        normalization = LpDistanceNormalization(1.0)
         param = SplitOracleParam(;
-            normalization = disjunctive_norm_param,
             dcglp_param = disjunctive_norm_dcglp_param(),
             reuse_dcglp = false,
         )
         @test param isa SplitOracleParam
-        @test param.normalization isa LpDistanceNormalization
-        @test param.normalization.norm_p == 1.0
+        @test :normalization ∉ fieldnames(SplitOracleParam)
+        @test normalization.norm_p == 1.0
         @test !param.reuse_dcglp
         @test LpDistanceNormalization(1).norm_p == 1.0
         @test LpDistanceNormalization(Inf).norm_p == Inf
         @test_throws ArgumentError LpDistanceNormalization(3.0)
 
-        adjusted_param = SplitOracleParam(;
-            normalization = ReversePolarNormalization(),
-            dcglp_param = disjunctive_norm_dcglp_param()
+        directional_normalization = ReversePolarNormalization(;
+            core_point_x = [0.25, 0.25],
+            core_point_t = [0.0],
         )
-        @test adjusted_param.normalization isa ReversePolarNormalization
+        @test directional_normalization isa ReversePolarNormalization
+        @test directional_normalization.core_point_x == [0.25, 0.25]
+        @test directional_normalization.use_core_point
 
-        directional_param = SplitOracleParam(;
-            normalization = ReversePolarNormalization(; core_point_x = [0.25, 0.25], core_point_t = [0.0]),
-            dcglp_param = disjunctive_norm_dcglp_param(),
+        fixed_direction_normalization = ReversePolarNormalization(;
+            core_direction_x = [0.0, 0.0],
+            core_direction_t = [1.0],
         )
-        @test directional_param isa SplitOracleParam
-        @test directional_param.normalization isa ReversePolarNormalization
-        @test directional_param.normalization.core_point_x == [0.25, 0.25]
-        @test directional_param.normalization.use_core_point
-
-        fixed_direction_param = SplitOracleParam(;
-            normalization = ReversePolarNormalization(; core_direction_x = [0.0, 0.0], core_direction_t = [1.0]),
-            dcglp_param = disjunctive_norm_dcglp_param(),
-        )
-        @test fixed_direction_param isa SplitOracleParam
-        @test fixed_direction_param.normalization isa ReversePolarNormalization
-        @test fixed_direction_param.normalization.core_point_x === nothing
-        @test fixed_direction_param.normalization.core_direction_x == [0.0, 0.0]
-        @test fixed_direction_param.normalization.core_direction_t == [1.0]
-        @test !fixed_direction_param.normalization.use_core_point
+        @test fixed_direction_normalization isa ReversePolarNormalization
+        @test fixed_direction_normalization.core_point_x === nothing
+        @test fixed_direction_normalization.core_direction_x == [0.0, 0.0]
+        @test fixed_direction_normalization.core_direction_t == [1.0]
+        @test !fixed_direction_normalization.use_core_point
     end
 
     @testset "constructor validation" begin
@@ -274,7 +266,8 @@ end
         @test_throws MethodError SplitOracle(
             master,
             collect(typical_oracles);
-            param = SplitOracleParam(; normalization = LpDistanceNormalization(), dcglp_param = dcglp_param),
+            normalization = LpDistanceNormalization(),
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
     end
 
@@ -287,42 +280,36 @@ end
         default_oracle = SplitOracle(
             master,
             typical_oracles;
-            param = SplitOracleParam(; normalization = default_normalization, dcglp_param = dcglp_param),
+            normalization = default_normalization,
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
-        @test default_oracle.param.normalization.core_direction_x == zeros(master.dim_x)
-        @test default_oracle.param.normalization.core_direction_t == ones(master.dim_t)
+        @test default_oracle.normalization === default_normalization
+        @test default_oracle.normalization.core_direction_x == zeros(master.dim_x)
+        @test default_oracle.normalization.core_direction_t == ones(master.dim_t)
 
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_oracles;
-            param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_point_x = [0.25], core_point_t = [0.0]),
-                dcglp_param = dcglp_param,
-            ),
+            normalization = ReversePolarNormalization(; core_point_x = [0.25], core_point_t = [0.0]),
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_oracles;
-            param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_point_x = [0.25, 0.25], core_point_t = [0.0, 0.0]),
-                dcglp_param = dcglp_param,
-            ),
+            normalization = ReversePolarNormalization(; core_point_x = [0.25, 0.25], core_point_t = [0.0, 0.0]),
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_oracles;
-            param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_direction_x = [0.0], core_direction_t = [1.0]),
-                dcglp_param = dcglp_param,
-            ),
+            normalization = ReversePolarNormalization(; core_direction_x = [0.0], core_direction_t = [1.0]),
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_oracles;
-            param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_direction_x = [0.0, 0.0], core_direction_t = [1.0, 1.0]),
-                dcglp_param = dcglp_param,
-            ),
+            normalization = ReversePolarNormalization(; core_direction_x = [0.0, 0.0], core_direction_t = [1.0, 1.0]),
+            param = SplitOracleParam(; dcglp_param = dcglp_param),
         )
     end
 
@@ -330,23 +317,35 @@ end
         data, master = build_disjunctive_norm_master()
         default_oracle = SplitOracle(master, build_typical_pair(data, master))
         @test default_oracle isa SplitOracle
-        @test default_oracle.param.normalization isa LpDistanceNormalization
-        @test default_oracle.param.normalization.norm_p == Inf
+        @test default_oracle.normalization isa LpDistanceNormalization
+        @test default_oracle.normalization.norm_p == Inf
 
         oracle = SplitOracle(
             master,
             build_typical_pair(data, master);
+            normalization = LpDistanceNormalization(),
             param = SplitOracleParam(;
-                normalization = LpDistanceNormalization(),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 reuse_dcglp = false,
             ),
         )
 
         @test oracle isa SplitOracle
-        @test oracle.param.normalization isa LpDistanceNormalization
+        @test oracle.normalization isa LpDistanceNormalization
         @test oracle isa BendersX.AbstractDisjunctiveOracle
         @test !oracle.param.reuse_dcglp
+
+        reverse_polar_oracle = SplitOracle(
+            master,
+            build_typical_pair(data, master);
+            normalization = ReversePolarNormalization(;
+                core_direction_x = zeros(master.dim_x),
+                core_direction_t = ones(master.dim_t),
+            ),
+            param = oracle.param,
+        )
+        @test reverse_polar_oracle.param === oracle.param
+        @test reverse_polar_oracle.normalization isa ReversePolarNormalization
     end
 
     @testset "direct generate_cuts smoke" begin
@@ -360,8 +359,8 @@ end
             oracle = SplitOracle(
                 master,
                 build_typical_pair(data, master);
+                normalization = normalization,
                 param = SplitOracleParam(;
-                    normalization = normalization,
                     dcglp_param = disjunctive_norm_dcglp_param(),
                     reuse_dcglp = false,
                 ),
@@ -375,8 +374,8 @@ end
         oracle = SplitOracle(
             master,
             (DcglpInterruptionTestOracle(), DcglpInterruptionTestOracle());
+            normalization = LpDistanceNormalization(),
             param = SplitOracleParam(;
-                normalization = LpDistanceNormalization(),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 reuse_dcglp = false,
             ),
@@ -425,8 +424,8 @@ end
         oracle = SplitOracle(
             master,
             build_typical_pair(data, master);
+            normalization = ExtensionContractNormalization(),
             param = SplitOracleParam(;
-                normalization = ExtensionContractNormalization(),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 reuse_dcglp = false,
             ),
@@ -440,8 +439,8 @@ end
         oracle = SplitOracle(
             master,
             build_typical_pair(data, master);
+            normalization = ReversePolarNormalization(),
             param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 split_index_selection_rule = LargestFractional(),
                 disjunctive_cut_append_rule = DisjunctiveCutsSmallerIndices(),
@@ -467,8 +466,8 @@ end
         oracle = SplitOracle(
             master,
             (DirectionalVectorTTestOracle(), DirectionalVectorTTestOracle());
+            normalization = ReversePolarNormalization(; core_point_x = [0.5, 0.5], core_point_t = [0.75, 0.75]),
             param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_point_x = [0.5, 0.5], core_point_t = [0.75, 0.75]),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 split_index_selection_rule = MostFractional(),
                 disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -486,8 +485,8 @@ end
         @test !is_in_L
         @test !isempty(oracle.disjunctive_cuts)
         cut = last(oracle.disjunctive_cuts)
-        direction_x = x_value .- oracle.param.normalization.core_point_x
-        direction_t = t_value .- oracle.param.normalization.core_point_t
+        direction_x = x_value .- oracle.normalization.core_point_x
+        direction_t = t_value .- oracle.normalization.core_point_t
         @test isapprox(dot(cut.a_x, direction_x) + dot(cut.a_t, direction_t), 1.0; atol = 1.0e-6)
         @test BendersX.evaluate_violation(cut, x_value, t_value) > 0.0
     end
@@ -500,8 +499,8 @@ end
         oracle = SplitOracle(
             master,
             (DirectionalVectorTTestOracle(), DirectionalVectorTTestOracle());
+            normalization = ReversePolarNormalization(; core_direction_x = direction_x, core_direction_t = direction_t),
             param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(; core_direction_x = direction_x, core_direction_t = direction_t),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 split_index_selection_rule = MostFractional(),
                 disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -519,8 +518,8 @@ end
         @test !is_in_L
         @test !isempty(oracle.disjunctive_cuts)
         cut = last(oracle.disjunctive_cuts)
-        cut_direction_x = .-oracle.param.normalization.core_direction_x
-        cut_direction_t = .-oracle.param.normalization.core_direction_t
+        cut_direction_x = .-oracle.normalization.core_direction_x
+        cut_direction_t = .-oracle.normalization.core_direction_t
         @test isapprox(dot(cut.a_x, cut_direction_x) + dot(cut.a_t, cut_direction_t), 1.0; atol = 1.0e-6)
         @test BendersX.evaluate_violation(cut, x_value, t_value) > 0.0
     end
@@ -530,8 +529,8 @@ end
         oracle = SplitOracle(
             master,
             build_typical_pair(data, master);
+            normalization = ReversePolarNormalization(),
             param = SplitOracleParam(;
-                normalization = ReversePolarNormalization(),
                 dcglp_param = disjunctive_norm_dcglp_param(),
                 split_index_selection_rule = LargestFractional(),
                 reuse_dcglp = false,

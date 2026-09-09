@@ -10,7 +10,7 @@ Available normalization schemes include:
 - [`LpDistanceNormalization`](@ref): Uses an ``L_p``-distance normalization.
 - [`ReversePolarNormalization`](@ref): Uses a reverse-polar normalization.
 
-See also: [`SplitOracleParam`](@ref), [`SplitOracle`](@ref)
+See also: [`SplitOracle`](@ref), [`SplitOracleParam`](@ref)
 """
 abstract type AbstractNormalization end
 

@@ -204,17 +204,20 @@ dcglp_optimizer = optimizer_with_attributes(
     MOI.Silent() => true,
 )
 dcglp_param = DcglpParam(dcglp_optimizer; time_limit = 200.0)
-disjunctive_norm_param = LpDistanceNormalization(1.0)
-
-# disjunctive oracle and callbacks
-disjunctive_oracle = SplitOracle(
-    master,
-    typical_oracles,
-    disjunctive_norm_param;
+normalization = LpDistanceNormalization(1.0)
+oracle_param = SplitOracleParam(;
     dcglp_param = dcglp_param,
     strengthened = true,
     lift = true,
     add_benders_cuts_to_master = 1,
+)
+
+# disjunctive oracle and callbacks
+disjunctive_oracle = SplitOracle(
+    master,
+    Tuple(typical_oracles);
+    normalization = normalization,
+    param = oracle_param,
 )
 user_callback = UserCallback(disjunctive_oracle; param = UserCallbackParam(frequency = 1))
 

@@ -3,12 +3,12 @@
 
 Parameters controlling [`SplitOracle`](@ref).
 
-`SplitOracleParam` contains `dcglp_param`, which configures the DCGLP solution process, while normalization-specific settings are stored in the `normalization` object.
+`SplitOracleParam` contains settings for the split/disjunctive procedure. The
+normalization algorithm is configured directly on [`SplitOracle`](@ref).
 
 # Fields
 
 - `dcglp_param::DcglpParam`: Parameters controlling the DCGLP solution process. See [`DcglpParam`](@ref) for available options.
-- `normalization::AbstractNormalization`: Normalization scheme used for disjunctive cut generation. See [`AbstractNormalization`](@ref) for available options.
 - `split_index_selection_rule::SplitIndexSelectionRule`: Rule used to select the master variable defining the split. See [`SplitIndexSelectionRule`](@ref) for available options.
 - `disjunctive_cut_append_rule::DisjunctiveCutsAppendRule`: Rule controlling which previously generated disjunctive cuts are included in the DCGLP. See [`DisjunctiveCutsAppendRule`](@ref) for available options.
 - `add_benders_cuts_to_master::Int`: Controls how byproduct Benders cuts are added to the master: unconditionally (`1`), only when violated (`2`), or not at all (`0`).
@@ -22,7 +22,6 @@ Parameters controlling [`SplitOracle`](@ref).
 # Constructor
 
     SplitOracleParam(;
-        normalization = LpDistanceNormalization(),
         dcglp_param = DcglpParam(),
         split_index_selection_rule = RandomFractional(),
         disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -35,11 +34,11 @@ Parameters controlling [`SplitOracle`](@ref).
         zero_tol = 1e-9,
     )
 
-Construct split-oracle parameters with configurable DCGLP, normalization, split-selection, cut-append, and cut-generation settings.
+Construct split-oracle parameters with configurable DCGLP, split-selection,
+cut-append, and cut-generation settings.
 """
 mutable struct SplitOracleParam <: AbstractOracleParam
     dcglp_param::DcglpParam
-    normalization::AbstractNormalization
     split_index_selection_rule::SplitIndexSelectionRule
     disjunctive_cut_append_rule::DisjunctiveCutsAppendRule
     add_benders_cuts_to_master::Int
@@ -52,7 +51,6 @@ mutable struct SplitOracleParam <: AbstractOracleParam
 
     function SplitOracleParam(;
         dcglp_param::DcglpParam = DcglpParam(),
-        normalization::AbstractNormalization = LpDistanceNormalization(),
         split_index_selection_rule::SplitIndexSelectionRule = RandomFractional(),
         disjunctive_cut_append_rule::DisjunctiveCutsAppendRule = AllDisjunctiveCuts(),
         add_benders_cuts_to_master::Union{Bool,Int} = 1,
@@ -81,7 +79,6 @@ mutable struct SplitOracleParam <: AbstractOracleParam
             )
 
         new(dcglp_param,
-            normalization,
             split_index_selection_rule,
             disjunctive_cut_append_rule,
             add_benders_cuts_to_master,
@@ -100,11 +97,15 @@ end
 
 Split-based disjunctive Benders oracle.
 
-`SplitOracle` uses a split disjunction and a DCGLP to generate disjunctive Benders cuts. The normalization scheme and other DCGLP configuration are specified through [`SplitOracleParam`](@ref). 
+`SplitOracle` uses a split disjunction and a DCGLP to generate disjunctive
+Benders cuts. The normalization scheme is a direct subcomponent of the oracle,
+while the remaining procedure settings are specified through
+[`SplitOracleParam`](@ref).
 
 # Fields
 
 - `param::SplitOracleParam`: Configuration of the split oracle.
+- `normalization::AbstractNormalization`: Normalization scheme used for disjunctive cut generation. See [`AbstractNormalization`](@ref) for available options.
 - `dcglp::Model`: The relaxed DCGLP problem used to generate disjunctive cuts.
 - `typical_oracles::Tuple{<:AbstractTypicalOracle,<:AbstractTypicalOracle}`: Typical Benders oracles associated with the two sides of the split.
 - `disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}`: Previously generated disjunctive cuts grouped by split index.
@@ -116,21 +117,25 @@ Split-based disjunctive Benders oracle.
     SplitOracle(
         master::AbstractMaster,
         typical_oracles::Tuple{T1,T2};
+        normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
     ) where {
     T1<:AbstractTypicalOracle,
     T2<:AbstractTypicalOracle,
 }
 
-Construct a split oracle using two typical Benders oracles and the specified split-oracle configuration.
+Construct a split oracle using two typical Benders oracles, a normalization
+algorithm, and the specified split-oracle configuration.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
 """
 mutable struct SplitOracle{
     T1 <: AbstractTypicalOracle,
     T2 <: AbstractTypicalOracle,
+    N <: AbstractNormalization,
 } <: AbstractDisjunctiveOracle
     param::SplitOracleParam
+    normalization::N
     dcglp::Model
     typical_oracles::Tuple{T1,T2}
     disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}
@@ -140,12 +145,13 @@ mutable struct SplitOracle{
     function SplitOracle(
         master::AbstractMaster,
         typical_oracles::Tuple{T1,T2};
+        normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
     ) where {
         T1<:AbstractTypicalOracle,
         T2<:AbstractTypicalOracle,
     }
-        dcglp = build_dcglp(master, param)
+        dcglp = build_dcglp(master, normalization, param)
         
         disjunctive_cuts_by_index = [
             Hyperplane[] for _ in 1:master.dim_x
@@ -153,8 +159,9 @@ mutable struct SplitOracle{
         disjunctive_cuts = Hyperplane[]
         splits = Tuple{SparseVector{Float64,Int},Float64}[]
 
-        new{T1, T2}(
+        new{T1, T2, typeof(normalization)}(
             param,
+            normalization,
             dcglp,
             typical_oracles,
             disjunctive_cuts_by_index,
@@ -175,7 +182,8 @@ end
 
 Generate disjunctive Benders cuts for a candidate master solution.
 
-The method selects a split, updates the DCGLP for the candidate solution, and solves the resulting DCGLP using the normalization configured in `oracle.param.normalization`.
+The method selects a split, updates the DCGLP for the candidate solution, and
+solves the resulting DCGLP using `oracle.normalization`.
 
 If the configured normalization requires fallback separation, or if disjunctive cut generation encounters an error and `oracle.param.fallback_to_typical_cuts` is `true`, the first typical oracle is used to generate typical Benders cuts.
 
@@ -198,10 +206,10 @@ function generate_cuts(
 )
     tic = time()
 
-    !is_applicable(oracle.param.normalization, oracle, x_value, t_value) &&
+    !is_applicable(oracle.normalization, oracle, x_value, t_value) &&
         return generate_cuts(oracle.typical_oracles[1], x_value, t_value; time_limit = max(time_limit - (time() - tic), 0.0))
 
-    update_dcglp_for_candidate!(oracle.param.normalization, oracle.dcglp, x_value, t_value)
+    update_dcglp_for_candidate!(oracle.normalization, oracle.dcglp, x_value, t_value)
 
     zero_indices, one_indices = choose_split_and_update_lifting!(oracle, x_value)
     update_dynamic_dcglp_constraints!(oracle)

@@ -40,8 +40,8 @@ remains unchanged.
 
 Each oracle in BendersX owns a `param` field of type `<: AbstractOracleParam`,
 which controls numerical tolerances and cut-generation behavior. By convention,
-an oracle named `XOracle` uses a parameter type named `XOracleParam`; split
-oracles use `SplitOracleParam` with an `AbstractNormalization`. See
+an oracle named `XOracle` uses a parameter type named `XOracleParam`.
+`SplitOracle` additionally owns an `AbstractNormalization` component. See
 [`API`](@ref api) for detailed descriptions of oracle-specific parameters.
 
 Common parameters include:
@@ -113,8 +113,9 @@ For mixed-integer master problems, BendersX provides the
 Dual Cut Generating Linear Program (DCGLP).
 
 A `SplitOracle` is constructed by combining two *typical* oracles (denoted by
-`κ` and `ν`) together with a `SplitOracleParam` object built from a disjunctive
-normalization parameter and a [`DcglpParam`](@ref) controlling the DCGLP.
+`κ` and `ν`) with a normalization component and a `SplitOracleParam`. The
+parameter object controls the split/disjunctive procedure and contains a
+[`DcglpParam`](@ref) for the DCGLP solution process.
 
 ```julia
 using CPLEX
@@ -130,9 +131,8 @@ dcglp_optimizer = optimizer_with_attributes(
     MOI.Silent() => true,
 )
 dcglp_param = DcglpParam(dcglp_optimizer)
-disjunctive_norm_param = LpDistanceNormalization()
-oracle_param = SplitOracleParam(
-    disjunctive_norm_param;
+normalization = LpDistanceNormalization()
+oracle_param = SplitOracleParam(;
     dcglp_param = dcglp_param,
     split_index_selection_rule = MostFractional(),
     strengthened = true,
@@ -141,6 +141,7 @@ oracle_param = SplitOracleParam(
 oracle = SplitOracle(
     master,
     (oracle_kappa, oracle_nu);
+    normalization = normalization,
     param = oracle_param,
 )
 ```
@@ -149,8 +150,10 @@ Attach the solver for the DCGLP through standard JuMP APIs such as `optimizer_wi
 The component oracles `oracle_kappa` and `oracle_nu` can be any implementation of typical oracles compatible with the underlying problem.
 
 ### Configuring `SplitOracle` Behavior
-The behavior of a `SplitOracle` is controlled entirely through
-`SplitOracleParam(disjunctive_norm_param; ...)`. Key options include:
+The normalization algorithm is selected directly on `SplitOracle`: use
+`LpDistanceNormalization(p)` for an ``L_p``-distance normalization or
+`ReversePolarNormalization(...)` for reverse-polar scaling. The remaining
+behavior is controlled through `SplitOracleParam`. Key options include:
 - Split selection
     - `split_index_selection_rule`: determines which fractional master variable is selected to form the disjunction.
 - Cut management
@@ -159,9 +162,8 @@ The behavior of a `SplitOracle` is controlled entirely through
 - Strengthening and lifting
     - `strengthened`: enables strengthening of disjunctive cuts.
     - `lift`: applies lifting based on variables fixed to 0 or 1.
-- DCGLP reuse and normalization
+- DCGLP reuse
     - `reuse_dcglp`: reuses the DCGLP model from previous cut generation.
-    - normalization object: use `LpDistanceNormalization(p)` for the DCGLP norm or `ReversePolarNormalization(...)` for reverse-polar scaling.
 These options allow fine-grained control over performance and numerical
 robustness.
 

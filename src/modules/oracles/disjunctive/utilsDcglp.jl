@@ -1,17 +1,26 @@
 
 """
-    build_dcglp(master::AbstractMaster, param::SplitOracleParam)
+    build_dcglp(
+        master::AbstractMaster,
+        normalization::AbstractNormalization,
+        param::SplitOracleParam,
+    )
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
-The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization-specific constraint defined by `param.normalization`.
+The method first constructs the common DCGLP formulation through
+`build_dcglp_base`, then adds the constraint defined by `normalization`.
 
 Returns the constructed JuMP model.
 """
-function build_dcglp(master::AbstractMaster, param::SplitOracleParam)
+function build_dcglp(
+    master::AbstractMaster,
+    normalization::AbstractNormalization,
+    param::SplitOracleParam,
+)
     dcglp, tau, sx, st = build_dcglp_base(master, param)
 
-    add_normalization_constraint!(param.normalization, master, dcglp, tau, sx, st)
+    add_normalization_constraint!(normalization, master, dcglp, tau, sx, st)
 
     return dcglp
 end
@@ -203,7 +212,7 @@ function solve_dcglp!(
     time_limit::Float64,
 )
     log = DcglpLog()
-    normalization = oracle.param.normalization
+    normalization = oracle.normalization
 
     dcglp = oracle.dcglp
     hyperplanes = Hyperplane[]

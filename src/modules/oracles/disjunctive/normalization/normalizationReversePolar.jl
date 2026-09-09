@@ -32,7 +32,7 @@ A core point and a fixed direction cannot be specified simultaneously. When a co
 
 When neither a core point nor a fixed direction is provided, the vertical direction `(core_direction_x = zeros(master.dim_x), core_direction_t = ones(master.dim_t))` is used by default. The default vertical direction is initialized when the normalization is prepared for a specific master. The validity of this direction is problem-dependent and is not guaranteed for all master formulations.
 
-See also: [`AbstractNormalization`](@ref), [`LpDistanceNormalization`](@ref), [`SplitOracleParam`](@ref)
+See also: [`AbstractNormalization`](@ref), [`LpDistanceNormalization`](@ref), [`SplitOracle`](@ref)
 """
 mutable struct ReversePolarNormalization <: AbstractNormalization
     core_point_x::Union{Nothing, Vector{Float64}}
