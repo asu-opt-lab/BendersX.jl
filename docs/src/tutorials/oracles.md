@@ -110,7 +110,6 @@ split_oracles = [
         SplitOracle(
             master,
             (kappa, nu);
-            dim_t = 1,
             param = deepcopy(split_param),
         )
     end
@@ -120,10 +119,12 @@ split_oracles = [
 oracle = SeparableOracle(master, split_oracles)
 ```
 
-Each child must consume one local `t` value, return exactly one scenario
-objective value, and produce cuts with a one-dimensional `a_t`. The wrapper
-copies each returned cut before embedding its `a_t` coefficient at the
-corresponding global scenario index, so child cut histories remain local.
+Each child declares how many local `t` values it consumes through
+`auxiliary_dimension`. The wrapper assigns each child a contiguous block of
+the global `t`, copies each returned cut, and embeds its local `a_t` into that
+block, so child cut histories remain local. Scalar scenario oracles use blocks
+of length one, while grouped oracles such as `UFLKnapsackOracle` may use larger
+blocks.
 
 !!! note
     `SeparableOracle` evaluates subproblems with Julia threads. The default GLPK
@@ -184,8 +185,10 @@ These two composition orders have different meanings:
 - `SeparableOracle(per-scenario SplitOracles)` builds one local DCGLP per
   scenario, so every generated cut acts only on that scenario's `t[j]`.
 
-For a local split oracle, pass `dim_t = 1`. Omitting `dim_t` preserves the
-usual global behavior and defaults to `master.dim_t`.
+`SplitOracle` obtains its auxiliary-variable dimension from its component
+oracles. Scalar typical oracles such as `ClassicalOracle` report dimension
+one, while `SeparableOracle` reports the sum of its component-oracle
+dimensions. The two component oracles must report the same dimension.
 
 ### Configuring `SplitOracle` Behavior
 

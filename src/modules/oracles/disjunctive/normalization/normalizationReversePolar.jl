@@ -28,9 +28,9 @@ The normalization direction can be determined from a core point and the current 
 
 Construct a reverse-polar normalization using either a core point or a fixed normalization direction.
 
-A core point and a fixed direction cannot be specified simultaneously. When a core point or direction is provided, both its `x` and `t` components must be specified and must have the same dimensions as the corresponding master variables. 
+A core point and a fixed direction cannot be specified simultaneously. When a core point or direction is provided, both its `x` and `t` components must be specified and must have the same dimensions as the corresponding oracle variables.
 
-When neither a core point nor a fixed direction is provided, the vertical direction `(core_direction_x = zeros(master.dim_x), core_direction_t = ones(master.dim_t))` is used by default. The default vertical direction is initialized when the normalization is prepared for a specific master. The validity of this direction is problem-dependent and is not guaranteed for all master formulations.
+When neither a core point nor a fixed direction is provided, a vertical direction with zeros in the `x` space and ones in the oracle's auxiliary-variable space is used by default. The default vertical direction is initialized when the normalization is prepared for a specific split oracle. Its validity is problem-dependent and is not guaranteed for all master formulations.
 
 See also: [`AbstractNormalization`](@ref), [`LpDistanceNormalization`](@ref), [`SplitOracle`](@ref)
 """

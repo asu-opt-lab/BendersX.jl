@@ -34,7 +34,7 @@ export LpDistanceNormalization
 export ReversePolarNormalization
 export BendersSeqParam, BendersSeqInOutParam, BendersBnBParam
 export LazyCallback, UserCallback, NoUserCallback, UserCallbackParam
-export LPRelaxationPreprocessing, NoPreprocessing, DisjunctiveLPRelaxationPreprocessing
+export LPRelaxationPreprocessing, NoPreprocessing
 
 # Common runtime statuses and configuration values
 export TerminationStatus, NotSolved, TimeLimit, Optimal, InfeasibleOrNumericalIssue
@@ -53,7 +53,8 @@ public AbstractLoopState, AbstractLoopLog, AbstractLoopParam
 public AbstractBendersSeqState, AbstractBendersSeqLog, AbstractBendersSeqParam
 public AbstractBendersBnBState, AbstractBendersBnBLog, AbstractBendersBnBParam
 public SplitIndexSelectionRule, DisjunctiveCutsAppendRule
-public generate_cuts, add_normalization_constraint!, update_dcglp_upper_bound_and_gap!
+public generate_cuts, auxiliary_dimension
+public add_normalization_constraint!, update_dcglp_upper_bound_and_gap!
 public disjunctive_cut_normalization_value
 public callback_node_count, callback_node_depth
 export update_master_model!, update_sub_model!

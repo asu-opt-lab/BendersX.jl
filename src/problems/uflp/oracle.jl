@@ -68,6 +68,8 @@ mutable struct UFLKnapsackOracle <: AbstractTypicalOracle
     UFLKnapsackOracle() = new()
 end
 
+auxiliary_dimension(oracle::UFLKnapsackOracle) = oracle.J
+
 function generate_cuts(oracle::UFLKnapsackOracle, x_value::Vector{Float64}, t_value::Vector{Float64}; tol_normalize = 1.0, time_limit = 3600.0)
     tic = time()
     critical_facility = Vector{Int}(undef, oracle.J)

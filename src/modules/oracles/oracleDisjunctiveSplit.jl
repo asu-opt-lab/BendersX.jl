@@ -102,8 +102,8 @@ Split-based disjunctive Benders oracle.
 - `param::SplitOracleParam`: Configuration of the split oracle.
 - `normalization::AbstractNormalization`: Normalization scheme used for disjunctive cut generation. See [`AbstractNormalization`](@ref) for available options.
 - `dcglp::Model`: The relaxed DCGLP problem used to generate disjunctive cuts.
-- `typical_oracles::Tuple{<:AbstractOracle,<:AbstractOracle}`: Oracles with a typical role associated with the two sides of the split.
-- `dim_t::Int`: Auxiliary-variable dimension used by this oracle's DCGLP.
+- `typical_oracles::Tuple{<:AbstractOracle,<:AbstractOracle}`: Typical oracles associated with the two sides of the split.
+- `dim_auxiliary::Int`: Auxiliary-variable dimension inferred from the component oracles and used by this oracle's DCGLP.
 - `disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}`: Previously generated disjunctive cuts grouped by split index.
 - `disjunctive_cuts::Vector{Hyperplane}`: Collection of generated disjunctive cuts.
 - `splits::Vector{Tuple{SparseVector{Float64,Int},Float64}}`: Split disjunctions generated during cut separation.
@@ -115,13 +115,14 @@ Split-based disjunctive Benders oracle.
         typical_oracles::Tuple{T1,T2};
         normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
-        dim_t::Int = master.dim_t,
     ) where {
     T1<:AbstractOracle,
     T2<:AbstractOracle,
 }
 
-Construct a split oracle using two typical oracles, a normalization scheme, and the specified split-oracle configuration.
+Construct a split oracle using two typical oracles, a normalization scheme,
+and the specified split-oracle configuration. The two component oracles must
+have the same auxiliary-variable dimension.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
 """
@@ -137,27 +138,41 @@ mutable struct SplitOracle{
     disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}
     disjunctive_cuts::Vector{Hyperplane}
     splits::Vector{Tuple{SparseVector{Float64, Int}, Float64}}
-    dim_t::Int
+    dim_auxiliary::Int
 
     function SplitOracle(
         master::AbstractMaster,
         typical_oracles::Tuple{T1,T2};
         normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
-        dim_t::Int = master.dim_t,
     ) where {
         T1<:AbstractOracle,
         T2<:AbstractOracle,
     }
-        dim_t > 0 || throw(ArgumentError("SplitOracle: `dim_t` must be positive."))
-        oracle_role(typical_oracles[1]) isa TypicalRole || throw(
-            ArgumentError("SplitOracle: the first component oracle must have a typical role."),
-        )
-        oracle_role(typical_oracles[2]) isa TypicalRole || throw(
-            ArgumentError("SplitOracle: the second component oracle must have a typical role."),
+        all(is_typical_oracle, typical_oracles) || throw(
+            ArgumentError("SplitOracle: both component oracles must be typical oracles."),
         )
 
-        dcglp = build_dcglp(master, normalization, param; dim_t = dim_t)
+        dims = auxiliary_dimension.(typical_oracles)
+        length(unique(dims)) == 1 || throw(
+            DimensionMismatch(
+                "SplitOracle: typical oracles must have the same " *
+                "auxiliary-variable dimension; got $(dims).",
+            ),
+        )
+        dim_auxiliary = first(dims)
+        dim_auxiliary > 0 || throw(
+            ArgumentError(
+                "SplitOracle: auxiliary-variable dimension must be positive.",
+            ),
+        )
+
+        dcglp = build_dcglp(
+            master,
+            normalization,
+            param;
+            dim_t = dim_auxiliary,
+        )
         
         disjunctive_cuts_by_index = [
             Hyperplane[] for _ in 1:master.dim_x
@@ -173,10 +188,12 @@ mutable struct SplitOracle{
             disjunctive_cuts_by_index,
             disjunctive_cuts,
             splits,
-            dim_t,
+            dim_auxiliary,
         )
     end
 end
+
+auxiliary_dimension(oracle::SplitOracle) = oracle.dim_auxiliary
 
 """
     generate_cuts(
@@ -212,10 +229,11 @@ function generate_cuts(
 )
     tic = time()
 
-    length(t_value) == oracle.dim_t || throw(
+    dim_auxiliary = auxiliary_dimension(oracle)
+    length(t_value) == dim_auxiliary || throw(
         DimensionMismatch(
             "SplitOracle received t_value with length $(length(t_value)); " *
-            "expected $(oracle.dim_t).",
+            "expected $dim_auxiliary.",
         ),
     )
 

@@ -191,6 +191,8 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
     end
 end
 
+auxiliary_dimension(::ParetoOracle) = 1
+
 """
     _apply_pareto_transformations!(pareto_model::Model, x_vars::Vector{VariableRef})
 

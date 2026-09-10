@@ -40,16 +40,25 @@ function generate_cuts(oracle::AbstractOracle, x_value::Vector{Float64}, t_value
     throw(UnimplementedInterfaceException("update generate_cuts for $(typeof(oracle))"))
 end
 
-# Internal role trait used by composite oracles. Unlike Julia's type hierarchy,
-# this can classify an oracle from the roles of its children.
-abstract type OracleRole end
-struct TypicalRole <: OracleRole end
-struct DisjunctiveRole <: OracleRole end
-struct MixedRole <: OracleRole end
+is_typical_oracle(::AbstractOracle) = false
+is_typical_oracle(::AbstractTypicalOracle) = true
 
-oracle_role(::AbstractOracle) = MixedRole()
-oracle_role(::AbstractTypicalOracle) = TypicalRole()
-oracle_role(::AbstractDisjunctiveOracle) = DisjunctiveRole()
+"""
+    auxiliary_dimension(oracle::AbstractOracle) -> Int
+
+Return the number of auxiliary variables consumed by `oracle`.
+
+Every concrete oracle must implement this interface. Scalar typical oracles
+return `1`, while composite oracles return the dimension of the auxiliary
+space represented by their components.
+"""
+function auxiliary_dimension(oracle::AbstractOracle)
+    throw(
+        UnimplementedInterfaceException(
+            "implement `auxiliary_dimension` for $(typeof(oracle))",
+        ),
+    )
+end
 
 # ---------------------------------------------------------------------------- 
 # Basic oracle parameters

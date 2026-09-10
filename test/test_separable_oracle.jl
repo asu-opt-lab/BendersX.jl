@@ -23,6 +23,14 @@ function update_separable_oracle_master!(model::Model, data::SeparableOracleTest
     return (x = x,), t
 end
 
+function update_block_ufl_master!(model::Model, data::UFLPData)
+    @variable(model, x[1:data.n_facilities], Bin)
+    @variable(model, t[1:(2 * data.n_customers)] >= 0)
+    @constraint(model, sum(x) >= 1)
+    @objective(model, Min, data.fixed_costs' * x + sum(t))
+    return (x = x,), t
+end
+
 function update_separable_oracle_sub!(
     model::Model,
     data::SeparableOracleTestData,
@@ -70,6 +78,8 @@ mutable struct StoredLocalDisjunctiveOracle <: BendersX.AbstractDisjunctiveOracl
     objective::Float64
 end
 
+BendersX.auxiliary_dimension(::StoredLocalDisjunctiveOracle) = 1
+
 function BendersX.generate_cuts(
     oracle::StoredLocalDisjunctiveOracle,
     ::Vector{Float64},
@@ -83,6 +93,8 @@ end
 struct HomogeneousDisjunctiveOracle <: BendersX.AbstractDisjunctiveOracle
     scen_idx::Int
 end
+
+BendersX.auxiliary_dimension(::HomogeneousDisjunctiveOracle) = 1
 
 function HomogeneousDisjunctiveOracle(
     data,
@@ -115,6 +127,15 @@ struct SeparableContractOracle <: BendersX.AbstractTypicalOracle
     is_in_L::Bool
 end
 
+BendersX.auxiliary_dimension(::SeparableContractOracle) = 1
+
+struct AuxiliaryDimensionTestOracle <: BendersX.AbstractTypicalOracle
+    dimension::Int
+end
+
+BendersX.auxiliary_dimension(oracle::AuxiliaryDimensionTestOracle) =
+    oracle.dimension
+
 function BendersX.generate_cuts(
     oracle::SeparableContractOracle,
     ::Vector{Float64},
@@ -139,7 +160,6 @@ function local_split_oracle(data, master, scen_idx::Int; reuse_dcglp::Bool = tru
     return SplitOracle(
         master,
         typical_pair;
-        dim_t = 1,
         param = separable_split_param(; reuse_dcglp = reuse_dcglp),
     )
 end
@@ -189,6 +209,44 @@ end
         @test objectives == [1.0, 2.0]
         @test collect(cuts[1].a_t) == [-1.0, 0.0]
         @test collect(cuts[2].a_t) == [0.0, -1.0]
+    end
+
+    @testset "supports multi-dimensional child auxiliary blocks" begin
+        data = UFLPData(
+            2,
+            2,
+            ones(2),
+            zeros(2),
+            [1.0 2.0; 3.0 4.0],
+        )
+        master = Master(
+            data;
+            model = update_block_ufl_master!,
+            optimizer = separable_oracle_optimizer(),
+        )
+        oracle = SeparableOracle(
+            master,
+            [UFLKnapsackOracle(data), UFLKnapsackOracle(data)],
+        )
+
+        @test oracle.dim_auxiliary == 4
+        @test oracle.auxiliary_ranges == [1:2, 3:4]
+        @test BendersX.auxiliary_dimension(oracle) == 4
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            oracle,
+            [1.0, 0.0],
+            zeros(4),
+        )
+
+        @test !is_in_L
+        @test objectives == [1.0, 2.0, 1.0, 2.0]
+        @test collect.(getfield.(cuts, :a_t)) == [
+            [-1.0, 0.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.0, -1.0, 0.0],
+            [0.0, 0.0, 0.0, -1.0],
+        ]
     end
 
     @testset "validates child and global output dimensions" begin
@@ -267,14 +325,14 @@ end
         split = SplitOracle(
             master,
             typical_pair;
-            dim_t = 1,
             normalization = normalization,
             param = SplitOracleParam(;
                 dcglp_param = separable_split_param().dcglp_param,
             ),
         )
 
-        @test split.dim_t == 1
+        @test split.dim_auxiliary == 1
+        @test BendersX.auxiliary_dimension(split) == 1
         @test length(split.dcglp[:st]) == 1
         @test normalization.core_direction_x == zeros(master.dim_x)
         @test normalization.core_direction_t == ones(1)
@@ -282,7 +340,6 @@ end
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_pair;
-            dim_t = 1,
             normalization = ReversePolarNormalization(;
                 core_direction_x = zeros(master.dim_x),
                 core_direction_t = ones(master.dim_t),
@@ -323,7 +380,7 @@ end
         @test length(objectives) == 2
     end
 
-    @testset "role checks preserve phase semantics" begin
+    @testset "typical classification and auxiliary dimensions" begin
         data, master = separable_oracle_fixture()
         typical = SeparableOracle(master, [
             ClassicalOracle(
@@ -343,12 +400,35 @@ end
             disjunctive.oracles[2],
         ])
 
+        @test BendersX.is_typical_oracle(typical)
+        @test !BendersX.is_typical_oracle(disjunctive)
+        @test !BendersX.is_typical_oracle(mixed)
+        @test BendersX.auxiliary_dimension(first(typical.oracles)) == 1
+        @test BendersX.auxiliary_dimension(typical) == 2
+
+        ufl_data = UFLPData(
+            2,
+            3,
+            ones(3),
+            ones(2),
+            ones(2, 3),
+        )
+        @test BendersX.auxiliary_dimension(UFLKnapsackOracle(ufl_data)) == 3
+
         @test SplitOracle(master, (typical, typical)) isa SplitOracle
         @test_throws ArgumentError SplitOracle(master, (mixed, typical))
-        @test DisjunctiveLPRelaxationPreprocessing(typical, disjunctive) isa
-              DisjunctiveLPRelaxationPreprocessing
-        @test_throws ArgumentError DisjunctiveLPRelaxationPreprocessing(mixed, disjunctive)
-        @test_throws ArgumentError DisjunctiveLPRelaxationPreprocessing(typical, mixed)
+        @test_throws DimensionMismatch SplitOracle(
+            master,
+            (AuxiliaryDimensionTestOracle(1), AuxiliaryDimensionTestOracle(2)),
+        )
+        @test_throws ArgumentError SplitOracle(
+            master,
+            (AuxiliaryDimensionTestOracle(0), AuxiliaryDimensionTestOracle(0)),
+        )
+        @test_throws DimensionMismatch SeparableOracle(
+            master,
+            [AuxiliaryDimensionTestOracle(2), AuxiliaryDimensionTestOracle(2)],
+        )
     end
 
     @testset "two-scenario BendersSeq matches extensive form" begin

@@ -11,6 +11,9 @@ struct SeparableInterruptionTestOracle <: BendersX.AbstractTypicalOracle
     interruption::Union{Nothing,Exception}
 end
 
+
+BendersX.auxiliary_dimension(::SeparableInterruptionTestOracle) = 1
+
 function BendersX.generate_cuts(
     oracle::SeparableInterruptionTestOracle,
     x_value::Vector{Float64},

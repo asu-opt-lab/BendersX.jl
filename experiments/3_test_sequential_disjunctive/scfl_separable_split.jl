@@ -71,7 +71,7 @@ function build_local_split_oracle(
     return SplitOracle(
         master,
         (kappa, nu);
-        dim_t = 1,
+        normalization = LpDistanceNormalization(1.0),
         param = deepcopy(split_param),
     )
 end
@@ -112,7 +112,6 @@ end
         verbose = false,
     )
     split_param = SplitOracleParam(;
-        normalization = LpDistanceNormalization(1.0),
         dcglp_param = dcglp_param,
         split_index_selection_rule = RandomFractional(),
         disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -223,7 +222,9 @@ end
 
                     @test env.termination_status == Optimal()
                     @test isapprox(reference_objective, env.obj_value; atol = 1.0e-5)
-                    @test all(child.dim_t == 1 for child in oracle.oracles)
+                    @test all(
+                        child.dim_auxiliary == 1 for child in oracle.oracles
+                    )
                     @test all(length(child.dcglp[:st]) == 1 for child in oracle.oracles)
                     @test all(
                         length(cut.a_t) == 1
