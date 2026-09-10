@@ -41,8 +41,7 @@ remains unchanged.
 Each oracle in BendersX owns a `param` field of type `<: AbstractOracleParam`,
 which controls numerical tolerances and cut-generation behavior. By convention,
 an oracle named `XOracle` uses a parameter type named `XOracleParam`.
-`SplitOracle` additionally owns an `AbstractNormalization` component. See
-[`API`](@ref api) for detailed descriptions of oracle-specific parameters.
+See [`API`](@ref api) for detailed descriptions of oracle-specific parameters.
 
 Common parameters include:
 
@@ -107,15 +106,17 @@ required constructor interface can be used as the template.
 
 ---
 
-## Using Split Oracles (`SplitOracle` with `LpDistanceNormalization`)
-For mixed-integer master problems, BendersX provides the
-[`SplitOracle`](@ref) with `LpDistanceNormalization`, which generates **disjunctive Benders cuts** by solving a
+## Using Split Oracles
+For mixed-integer master problems, BendersX provides
+[`SplitOracle`](@ref) for generating **disjunctive Benders cuts** through a
 Dual Cut Generating Linear Program (DCGLP).
 
-A `SplitOracle` is constructed by combining two *typical* oracles (denoted by
-`κ` and `ν`) with a normalization scheme and a `SplitOracleParam`. The
-parameter object controls the split procedure and contains a
-[`DcglpParam`](@ref) for the DCGLP solution process.
+A `SplitOracle` uses two *typical* oracles, denoted by `oracle_kappa` and
+`oracle_nu`, together with a normalization scheme and a `SplitOracleParam`.
+The typical oracles perform separation over the two sides of the split
+disjunction, while the normalization scheme specifies the normalization
+imposed in the DCGLP. `SplitOracleParam` controls the remaining algorithmic
+choices and contains a [`DcglpParam`](@ref) for configuring the DCGLP.
 
 ```julia
 using CPLEX
@@ -145,14 +146,20 @@ oracle = SplitOracle(
     param = oracle_param,
 )
 ```
-Attach the solver for the DCGLP through standard JuMP APIs such as `optimizer_with_attributes(...)`.
-
-The component oracles `oracle_kappa` and `oracle_nu` can be any implementation of typical oracles compatible with the underlying problem.
+The DCGLP optimizer can be configured through the standard JuMP
+`optimizer_with_attributes` interface, as shown above. `oracle_kappa` and `oracle_nu`
+can be any typical oracles that are compatible with the subproblem.
 
 ### Configuring `SplitOracle` Behavior
-The normalization scheme is selected directly on `SplitOracle`: use
-`LpDistanceNormalization(p)` for an ``L_p``-distance normalization or
-`ReversePolarNormalization(...)` for reverse-polar scaling. The remaining
+
+The normalization scheme is selected when constructing `SplitOracle`. The
+default is `LpDistanceNormalization(Inf)`, which seeks a valid disjunctive cut
+maximizing its $\ell_\infty$ distance from the separation point.
+`LpDistanceNormalization(p)` provides an $\ell_p$-distance normalization for
+$p \in \{1,2,\infty\}$, while `ReversePolarNormalization(...)` provides
+reverse-polar normalization.
+
+The remaining
 behavior is controlled through `SplitOracleParam`. Key options include:
 - Split selection
     - `split_index_selection_rule`: determines which fractional master variable is selected to form the disjunction.

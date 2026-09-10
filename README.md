@@ -71,7 +71,7 @@ log = solve!(env)
 
 Users describe a decomposition model by writing ordinary JuMP code in two functions, one for the master and another for the subproblem. The master function adds the first-stage variables, constraints, and objective, then returns `(x, t)`, where `x` is a named tuple of master variables and `t` contains the auxiliary variables used in Benders cuts. A model-based oracle uses a subproblem function that adds the recourse variables and constraints; its keyword arguments must match the names returned in `x`.
 
-Pass these functions to `Master` and the oracle through the `model` keyword. Problem data can be any Julia object; no package-specific supertype is required. If a required modeling function is missing for its type, the default method throws `UnimplementedInterfaceException`. See the package documentation for complete examples. If you are new to JuMP, start with the JuMP documentation: [https://jump.dev/JuMP.jl/stable/](https://jump.dev/JuMP.jl/stable/).
+Pass these functions to `Master` and the oracle through the `model` keyword. Problem data can be any Julia object. If a required modeling function is missing for its type, the default method throws `UnimplementedInterfaceException`. See the package documentation for complete examples. If you are new to JuMP, start with the JuMP documentation: [https://jump.dev/JuMP.jl/stable/](https://jump.dev/JuMP.jl/stable/).
 
 ## Built-in variants
 

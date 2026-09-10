@@ -124,7 +124,7 @@ Attach solvers through standard JuMP APIs such as `optimizer_with_attributes(...
 ## 2. Data 
 *Providing Instance Data to the Benders Engine*
 
-Problem data can be stored in any Julia object that provides the parameters required by the master and subproblem models. BendersX does not require a package-specific supertype or impose restrictions on the structure or fields of the data container.
+Problem data can be stored in any Julia object that provides the parameters needed to construct the master and subproblem models.
 
 ### Example
 The [parameters](@ref cflp-parameter) of the Capacitated Facility Location Problem (CFLP) may be written as:
