@@ -40,9 +40,8 @@ remains unchanged.
 
 Each oracle in BendersX owns a `param` field of type `<: AbstractOracleParam`,
 which controls numerical tolerances and cut-generation behavior. By convention,
-an oracle named `XOracle` uses a parameter type named `XOracleParam`; split
-oracles use `SplitOracleParam` with an `AbstractNormalization`. See
-[`API`](@ref api) for detailed descriptions of oracle-specific parameters.
+an oracle named `XOracle` uses a parameter type named `XOracleParam`.
+See [`API`](@ref api) for detailed descriptions of oracle-specific parameters.
 
 Common parameters include:
 
@@ -107,14 +106,17 @@ required constructor interface can be used as the template.
 
 ---
 
-## Using Split Oracles (`SplitOracle` with `LpDistanceNormalization`)
-For mixed-integer master problems, BendersX provides the
-[`SplitOracle`](@ref) with `LpDistanceNormalization`, which generates **disjunctive Benders cuts** by solving a
+## Using Split Oracles
+For mixed-integer master problems, BendersX provides
+[`SplitOracle`](@ref) for generating **disjunctive Benders cuts** through a
 Dual Cut Generating Linear Program (DCGLP).
 
-A `SplitOracle` is constructed by combining two *typical* oracles (denoted by
-`κ` and `ν`) together with a `SplitOracleParam` object built from a disjunctive
-normalization parameter and a [`DcglpParam`](@ref) controlling the DCGLP.
+A `SplitOracle` uses two *typical* oracles, denoted by `oracle_kappa` and
+`oracle_nu`, together with a normalization scheme and a `SplitOracleParam`.
+The typical oracles perform separation over the two sides of the split
+disjunction, while the normalization scheme specifies the normalization
+imposed in the DCGLP. `SplitOracleParam` controls the remaining algorithmic
+choices and contains a [`DcglpParam`](@ref) for configuring the DCGLP.
 
 ```julia
 using CPLEX
@@ -130,9 +132,8 @@ dcglp_optimizer = optimizer_with_attributes(
     MOI.Silent() => true,
 )
 dcglp_param = DcglpParam(dcglp_optimizer)
-disjunctive_norm_param = LpDistanceNormalization()
-oracle_param = SplitOracleParam(
-    disjunctive_norm_param;
+normalization = LpDistanceNormalization()
+oracle_param = SplitOracleParam(;
     dcglp_param = dcglp_param,
     split_index_selection_rule = MostFractional(),
     strengthened = true,
@@ -141,16 +142,25 @@ oracle_param = SplitOracleParam(
 oracle = SplitOracle(
     master,
     (oracle_kappa, oracle_nu);
+    normalization = normalization,
     param = oracle_param,
 )
 ```
-Attach the solver for the DCGLP through standard JuMP APIs such as `optimizer_with_attributes(...)`.
-
-The component oracles `oracle_kappa` and `oracle_nu` can be any implementation of typical oracles compatible with the underlying problem.
+The DCGLP optimizer can be configured through the standard JuMP
+`optimizer_with_attributes` interface, as shown above. `oracle_kappa` and `oracle_nu`
+can be any typical oracles that are compatible with the subproblem.
 
 ### Configuring `SplitOracle` Behavior
-The behavior of a `SplitOracle` is controlled entirely through
-`SplitOracleParam(disjunctive_norm_param; ...)`. Key options include:
+
+The normalization scheme is selected when constructing `SplitOracle`. The
+default is `LpDistanceNormalization(Inf)`, which seeks a valid disjunctive cut
+maximizing its $\ell_\infty$ distance from the separation point.
+`LpDistanceNormalization(p)` provides an $\ell_p$-distance normalization for
+$p \in \{1,2,\infty\}$, while `ReversePolarNormalization(...)` provides
+reverse-polar normalization.
+
+The remaining
+behavior is controlled through `SplitOracleParam`. Key options include:
 - Split selection
     - `split_index_selection_rule`: determines which fractional master variable is selected to form the disjunction.
 - Cut management
@@ -159,9 +169,8 @@ The behavior of a `SplitOracle` is controlled entirely through
 - Strengthening and lifting
     - `strengthened`: enables strengthening of disjunctive cuts.
     - `lift`: applies lifting based on variables fixed to 0 or 1.
-- DCGLP reuse and normalization
+- DCGLP reuse
     - `reuse_dcglp`: reuses the DCGLP model from previous cut generation.
-    - normalization object: use `LpDistanceNormalization(p)` for the DCGLP norm or `ReversePolarNormalization(...)` for reverse-polar scaling.
 These options allow fine-grained control over performance and numerical
 robustness.
 

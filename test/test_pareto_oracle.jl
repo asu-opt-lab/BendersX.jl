@@ -17,7 +17,7 @@ using HiGHS
 # Test Problem: Simple Assignment Problem
 # =============================================================================
 
-struct SimpleParetoTestData <: AbstractData
+struct SimpleParetoTestData
     n_facilities::Int
     n_customers::Int
     costs::Matrix{Float64}
@@ -172,7 +172,7 @@ end
 
     @testset "Interval Constraint Reformulation" begin
         # Verify σ coefficients are correct after splitting interval constraints
-        struct ParetoIntervalReformData <: AbstractData
+        struct ParetoIntervalReformData
             n::Int
         end
 
@@ -505,7 +505,7 @@ end
         # Test that the pareto reformulation produces the correct model structure
 
         # Simple test problem with known structure
-        struct ParetoReformTestData <: AbstractData
+        struct ParetoReformTestData
             n::Int  # number of decision variables
         end
 

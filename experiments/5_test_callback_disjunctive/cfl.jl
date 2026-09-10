@@ -64,7 +64,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                 # for strengthened in [true; false], add_benders_cuts_to_master in [true; false; 2], reuse_dcglp in [true; false], p in [1.0; Inf], lift in [true; false], disjunctive_cut_append_rule in [NoDisjunctiveCuts(); AllDisjunctiveCuts(); DisjunctiveCutsSmallerIndices()]
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; lift $lift; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -78,13 +78,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -99,13 +99,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -120,13 +120,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -144,7 +144,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; lift $lift; p $p; dcut_append $disjunctive_cut_append_rule" begin
 
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -158,13 +158,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -178,13 +178,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -198,13 +198,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -220,7 +220,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
             @testset "Unified oracle" begin
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -234,13 +234,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer), UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -251,13 +251,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer), UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -268,13 +268,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer), UnifiedOracle(data, master; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -286,7 +286,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
             @testset "Pareto oracle" begin
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -301,13 +301,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             pareto_param = ParetoOracleParam(ones(data.n_facilities))
                             lazy_oracle = ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer), ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -319,13 +319,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             pareto_param = ParetoOracleParam(ones(data.n_facilities))
                             lazy_oracle = ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer), ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -337,13 +337,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             pareto_param = ParetoOracleParam(ones(data.n_facilities))
                             lazy_oracle = ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)
                             typical_oracles = [ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer), ParetoOracle(data, master, pareto_param; model = update_sub_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -355,7 +355,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
             @testset "Classic oracle with GBC" begin
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -369,13 +369,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -386,13 +386,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -403,13 +403,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), ClassicalOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -421,7 +421,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
             @testset "Knapsack oracle with GBC" begin
                 for strengthened in [true], add_benders_cuts_to_master in [true], reuse_dcglp in [true], p in [1.0], lift in [true], disjunctive_cut_append_rule in [AllDisjunctiveCuts()]
                     @testset "strgthnd $strengthened; benders2master $add_benders_cuts_to_master; reuse $reuse_dcglp; p $p; lift $lift; dcut_append $disjunctive_cut_append_rule" begin
-                        oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(p), dcglp_param = dcglp_param,
+                        oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
                                                                 split_index_selection_rule = RandomFractional(),
                                                                 disjunctive_cut_append_rule = disjunctive_cut_append_rule,
                                                                 strengthened = strengthened,
@@ -435,13 +435,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = NoPreprocessing()
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -452,13 +452,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeq, param = BendersSeqParam(;time_limit=200.0, gap_tolerance=1e-9, verbose=false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)
@@ -469,13 +469,13 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
                             master = Master(data; model = update_master_model!, optimizer = mip_optimizer)
                             lazy_oracle = CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)
                             typical_oracles = [CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer), CFLKnapsackOracle(data, master; model = update_sub_gbc_model!, optimizer = optimizer)]
-                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+                            disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); normalization = LpDistanceNormalization(p), param = oracle_param)
 
                             preprocessing = LPRelaxationPreprocessing(lazy_oracle; seq_env_type = BendersSeqInOut, param = BendersSeqInOutParam(time_limit = 300.0, gap_tolerance = 1e-9, stabilizing_x = ones(data.n_facilities), α = 0.9, λ = 0.1, verbose = false))
                             lazy_callback = LazyCallback(lazy_oracle)
                             user_callback = UserCallback(disjunctive_oracle; param=user_cb_param)
 
-                            env = BendersBnB(master, preprocessing, lazy_callback, user_callback; param = benders_param)
+                            env = BendersBnB(master; preprocessing = preprocessing, lazy_callback = lazy_callback, user_callback = user_callback, param = benders_param)
                             log = solve!(env)
                             @test env.termination_status == Optimal()
                             @test isapprox(mip_opt_val, env.obj_value, atol=1e-5)

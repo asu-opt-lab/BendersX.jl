@@ -1,5 +1,5 @@
 """
-    LPRelaxationPreprocessing <: AbstractBendersPreprocessing
+    LPRelaxationPreprocessing <: AbstractPreprocessing
 
 LP-relaxation preprocessing using a sequential Benders environment.
 
@@ -23,7 +23,7 @@ Construct an LP-relaxation preprocessing strategy using `oracle`.
 
 By default, [`BendersSeq`](@ref) is used as the sequential preprocessing environment with default [`BendersSeqParam`](@ref) parameters.
 """
-mutable struct LPRelaxationPreprocessing <: AbstractBendersPreprocessing
+mutable struct LPRelaxationPreprocessing <: AbstractPreprocessing
     oracle::AbstractOracle
     seq_env_type::Type{<:AbstractBendersSeq}
     param::AbstractBendersSeqParam

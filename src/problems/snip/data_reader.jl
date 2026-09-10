@@ -1,11 +1,11 @@
 using JSON
 
 """
-    SNIPData <: AbstractData
+    SNIPData
 
 Data container for the stochastic network interdiction problem.
 """
-struct SNIPData <: AbstractData
+struct SNIPData
     num_nodes::Int
     num_scenarios::Int
     scenarios::Vector{Tuple{Int,Int,Float64}}

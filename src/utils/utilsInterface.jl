@@ -1,5 +1,5 @@
 """
-    update_master_model!(model::Model, data::AbstractData) -> (x, t)
+    update_master_model!(model::Model, data) -> (x, t)
 
 Formulate the master problem for `data` in `model`.
 
@@ -9,7 +9,8 @@ To use `Master(data)` with a custom data type, define
 
     update_master_model!(model::Model, data::MyDataType) -> (x, t)
 
-where `MyDataType` is the concrete subtype of [`AbstractData`](@ref) that represents your problem data.
+where `MyDataType` is the type that represents your problem data. BendersX does
+not require it to have a particular supertype.
 
 The function must:
 1. Add the master variables, constraints, and objective to `model`.
@@ -28,7 +29,7 @@ function.
 # Example
 
 ```julia
-struct MyDataType <: AbstractData
+struct MyDataType
     n::Int
 end
 
@@ -52,14 +53,14 @@ Master(data; model = build_master_model!)
 
 In that case, `build_master_model!(model, data)` must follow the same interface.
 """
-function update_master_model!(model::Model, data::AbstractData)
+function update_master_model!(model::Model, data)
     throw(UnimplementedInterfaceException(
         "BendersX does not know how to formulate a master problem for " * "$(typeof(data)). Define " * "`update_master_model!(model::Model, data::$(typeof(data)))`, " * "or pass a custom model-building function with " * "`Master(data; model = your_builder!)`."
 ))
 end
 
 """
-    update_sub_model!(model::Model, data::AbstractData, scen_idx::Int; kwargs...)
+    update_sub_model!(model::Model, data, scen_idx::Int; kwargs...)
 
 Formulate the subproblem for scenario `scen_idx` using `data` in `model`.
 
@@ -69,7 +70,8 @@ To use a model-based oracle with a custom data type,
 
     update_sub_model!(model::Model, data::MyDataType, scen_idx::Int; kwargs...)
 
-where `MyDataType` is a concrete subtype of [`AbstractData`](@ref) that represents your problem data.
+where `MyDataType` is the type that represents your problem data. BendersX does
+not require it to have a particular supertype.
 
 The method must:
 
@@ -104,7 +106,7 @@ Optimizer selection is handled elsewhere. Do not attach an optimizer to
 # Example
 
 ```julia
-struct MyDataType <: AbstractData
+struct MyDataType
     demand::Vector{Float64}
     cost::Vector{Float64}
 end
@@ -129,8 +131,8 @@ ClassicalOracle(data, master; model = build_sub_model!)
 In that case, `build_sub_model!(model, data, scen_idx; kwargs...)` must follow
 the same interface.
 """
-function update_sub_model!(model::Model, data::AbstractData, scen_idx::Int; kwargs...) 
+function update_sub_model!(model::Model, data, scen_idx::Int; kwargs...)
     throw(UnimplementedInterfaceException( 
-        "BendersX does not know how to formulate a subproblem for " * "$(typeof(data)). Define " * "`update_sub_model!(model::Model, data::$(typeof(data)), " * "scen_idx::Int; kwargs...)`, or pass a custom model-building " * 
+        "BendersX does not know how to formulate a subproblem for " * "$(typeof(data)). Define " * "`update_sub_model!(model::Model, data::$(typeof(data)), " * "scen_idx::Int; kwargs...)`, or pass a custom model-building " *
         "function with `Oracle(...; model = your_builder!)`." )) 
 end

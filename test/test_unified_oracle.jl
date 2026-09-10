@@ -16,7 +16,7 @@ using HiGHS
 # Test Problem: Simple Assignment Problem
 # =============================================================================
 
-struct SimpleUnifiedTestData <: AbstractData
+struct SimpleUnifiedTestData
     n_facilities::Int
     n_customers::Int
     costs::Matrix{Float64}
@@ -252,7 +252,7 @@ end
 
     @testset "Interval Constraint Reformulation" begin
         # Verify that interval constraints are split and σ is correctly applied
-        struct UnifiedIntervalReformData <: AbstractData
+        struct UnifiedIntervalReformData
             n::Int
         end
 
@@ -398,7 +398,7 @@ end
         # Test that the unified reformulation produces the correct model structure
 
         # Simple test problem with known structure
-        struct ReformTestData <: AbstractData
+        struct ReformTestData
             n::Int  # number of decision variables
         end
 

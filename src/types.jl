@@ -105,22 +105,6 @@ See also: [`BasicOracleParam`](@ref), [`AbstractOracle`](@ref)
 """
 abstract type AbstractOracleParam end
 
-# ----------------------------------------------------------------------------
-# Problem data
-# ----------------------------------------------------------------------------
-
-"""
-    AbstractData
-
-Abstract supertype for user-defined problem data.
-
-Concrete subtypes store the coefficients, dimensions, scenario information, and other data required to formulate the master and subproblem models.
-
-See also: [`Master`](@ref), [`ClassicalOracle`](@ref)
-"""
-abstract type AbstractData end
-
-
 # ============================================================================
 # GBC (Generalized Bound Constraints) Bound Type
 # ============================================================================

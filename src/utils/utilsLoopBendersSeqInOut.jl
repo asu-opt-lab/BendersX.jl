@@ -12,7 +12,7 @@ In addition to the standard sequential Benders stopping criteria, these paramete
 - `halt_limit::Int`: Maximum number of consecutive iterations without sufficient lower-bound improvement.
 - `iter_limit::Int`: Maximum number of Benders iterations.
 - `verbose::Bool`: Whether to print iteration information.
-- `stabilizing_x::Vector{Float64}`: Current stabilizing point in the first-stage variable space. It is updated in place during the in-out stabilization procedure.
+- `stabilizing_x::Vector{Float64}`: Initial stabilizing point in the first-stage variable space.
 - `α::Float64`: Weight used to update the stabilizing point.
 - `λ::Float64`: Weight used to form the perturbed oracle query point.
 

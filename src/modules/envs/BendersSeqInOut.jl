@@ -18,7 +18,7 @@ and Ben-Ameur and Neto (2007).
 - `oracle::AbstractOracle`: Oracle used for subproblem evaluation and cut generation
 - `param::BendersSeqInOutParam`: Parameters controlling the algorithm and its
   stabilization strategy.
-- `preprocessing::AbstractBendersPreprocessing`: Configuration for optionally preprocessing the LP relaxation of the master problem before the Benders iterations.
+- `preprocessing::AbstractPreprocessing`: Configuration for optionally preprocessing the LP relaxation of the master problem before the Benders iterations.
 - `obj_value::Float64`: Objective value of the best solution found
 - `termination_status::TerminationStatus`: Termination status of the Benders algorithm. See [`TerminationStatus`](@ref) for available statuses.
 
@@ -34,7 +34,7 @@ The stabilization parameters are specified through [`BendersSeqInOutParam`](@ref
         master::AbstractMaster,
         oracle::AbstractOracle;
         param::BendersSeqInOutParam = BendersSeqInOutParam(),
-        preprocessing::AbstractBendersPreprocessing = NoPreprocessing(),
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
     )
 
 Construct a sequential Benders environment with in-out stabilization.
@@ -55,7 +55,7 @@ df = solve!(env)
 - M. Fischetti, I. Ljubić, and M. Sinnl, "Redesigning Benders decomposition for large-scale facility location," Management Science, 63 (2017), 2146–2162.
 - W. Ben-Ameur and J. Neto, "Acceleration of cutting-plane and column generation algorithms: Applications to network design," Networks, 49 (2007), 3–17.
 
-See also: [`BendersSeq`](@ref), [`AbstractBendersPreprocessing`](@ref)
+See also: [`BendersSeq`](@ref), [`AbstractPreprocessing`](@ref)
 """
 mutable struct BendersSeqInOut <: AbstractBendersSeq
     master::AbstractMaster
@@ -63,7 +63,7 @@ mutable struct BendersSeqInOut <: AbstractBendersSeq
 
     param::BendersSeqInOutParam 
 
-    preprocessing::AbstractBendersPreprocessing
+    preprocessing::AbstractPreprocessing
 
     # result
     obj_value::Float64
@@ -73,7 +73,7 @@ mutable struct BendersSeqInOut <: AbstractBendersSeq
         master::AbstractMaster,
         oracle::AbstractOracle;
         param::BendersSeqInOutParam = BendersSeqInOutParam(),
-        preprocessing::AbstractBendersPreprocessing = NoPreprocessing(),
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
     )
 
         new(master, oracle, param, preprocessing, Inf, NotSolved())

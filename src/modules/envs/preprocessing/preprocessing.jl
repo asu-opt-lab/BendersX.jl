@@ -1,20 +1,20 @@
 """
-    AbstractBendersPreprocessing
+    AbstractPreprocessing
 
 Abstract supertype for preprocessing strategies in Benders decomposition.
 
 A preprocessing strategy may modify the master problem and generate initial Benders cuts before the sequential Benders or MIP branch-and-bound search begins.
 """
-abstract type AbstractBendersPreprocessing end
+abstract type AbstractPreprocessing end
 
 """
-    NoPreprocessing <: AbstractBendersPreprocessing
+    NoPreprocessing <: AbstractPreprocessing
 
 No-op preprocessing strategy.
 
 Use this type when no preprocessing or initial Benders cuts should be generated before Benders decomposition.
 """
-struct NoPreprocessing <: AbstractBendersPreprocessing end
+struct NoPreprocessing <: AbstractPreprocessing end
 
 """
     preprocess!(master::AbstractMaster, preprocessing::NoPreprocessing) -> Float64
@@ -27,5 +27,5 @@ function preprocess!(master::AbstractMaster, preprocessing::NoPreprocessing; tim
     return 0.0
 end
 
-include("preprocessingLP.jl") 
-include("preprocessingDisjunctive.jl") 
+include("preprocessingLP.jl")
+include("preprocessingDisjunctive.jl")

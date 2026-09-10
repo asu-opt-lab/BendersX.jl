@@ -128,7 +128,6 @@ dcglp_param = DcglpParam(;
 )
 
 oracle_param = SplitOracleParam(;
-    normalization = ReversePolarNormalization(),
     dcglp_param = dcglp_param,
     split_index_selection_rule = LargestFractional(),
     disjunctive_cut_append_rule = AllDisjunctiveCuts(),
@@ -153,7 +152,12 @@ typical_oracles = (
         param = UFLKnapsackOracleParam(add_only_violated_cuts = true),
     ),
 )
-disjunctive_oracle = SplitOracle(master, typical_oracles; param = oracle_param)
+disjunctive_oracle = SplitOracle(
+    master,
+    typical_oracles;
+    normalization = ReversePolarNormalization(),
+    param = oracle_param,
+)
 
 lazy_oracle = UFLKnapsackOracle(
     data;
@@ -172,10 +176,10 @@ lazy_callback = LazyCallback(lazy_oracle)
 user_callback = UserCallback(disjunctive_oracle; param = UserCallbackParam(frequency = frequency))
 
 env = BendersBnB(
-    master,
-    preprocessing,
-    lazy_callback,
-    user_callback;
+    master;
+    preprocessing = preprocessing,
+    lazy_callback = lazy_callback,
+    user_callback = user_callback,
     param = benders_param,
 )
 

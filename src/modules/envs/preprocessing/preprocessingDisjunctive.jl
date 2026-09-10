@@ -1,6 +1,6 @@
 
 """
-    DisjunctiveLPRelaxationPreprocessing <: AbstractBendersPreprocessing
+    DisjunctiveLPRelaxationPreprocessing <: AbstractPreprocessing
 
 Two-phase preprocessing that first runs a typical
 oracle-based separation and then a disjunctive oracle separation to
@@ -29,7 +29,7 @@ env = BendersBnB(master, preprocessing, lazy_callback, user_callback)
 ```
 See also: [`LPRelaxationPreprocessing`](@ref), [`AbstractDisjunctiveOracle`](@ref)
 """
-mutable struct DisjunctiveLPRelaxationPreprocessing <: AbstractBendersPreprocessing
+mutable struct DisjunctiveLPRelaxationPreprocessing <: AbstractPreprocessing
     typical_oracle::AbstractTypicalOracle
     disjunctive_oracle::AbstractDisjunctiveOracle
     seq_env_type::Type{<:AbstractBendersSeq}

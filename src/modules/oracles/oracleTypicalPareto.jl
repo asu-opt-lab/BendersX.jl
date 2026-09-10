@@ -87,11 +87,11 @@ where:
 
 # Constructors
 ```julia
-ParetoOracle(data::AbstractData, master::Master, param::ParetoOracleParam;
+ParetoOracle(data, master::Master, param::ParetoOracleParam;
              model = update_sub_model!,
              scen_idx::Int = 0)
 
-ParetoOracle(data::AbstractData, master::Master; 
+ParetoOracle(data, master::Master;
             model = update_sub_model!,
             scen_idx::Int = 0,
             param::ParetoOracleParam)
@@ -128,7 +128,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
     # Magnanti-Wong pareto model
     pareto_model::Model
 
-    function ParetoOracle(data::AbstractData, master::Master, param::ParetoOracleParam;
+    function ParetoOracle(data, master::Master, param::ParetoOracleParam;
                          model = update_sub_model!,
                          scen_idx::Int = 0,
                          optimizer = DEFAULT_OPTIMIZER)
@@ -182,7 +182,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
 
     ParetoOracle() = new()
 
-    function ParetoOracle(data::AbstractData, master::Master;
+    function ParetoOracle(data, master::Master;
                           model = update_sub_model!,
                           scen_idx::Int = 0,
         param::ParetoOracleParam,

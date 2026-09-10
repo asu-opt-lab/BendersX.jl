@@ -74,7 +74,7 @@ dcglp_param = DcglpParam(; optimizer = dcglp_optimizer,
     verbose = true
 )
 
-oracle_param = SplitOracleParam(; normalization = LpDistanceNormalization(1.0), dcglp_param = dcglp_param,
+oracle_param = SplitOracleParam(; dcglp_param = dcglp_param,
     split_index_selection_rule = RandomFractional(),
     disjunctive_cut_append_rule = AllDisjunctiveCuts(),
     strengthened = true,
@@ -100,7 +100,12 @@ typical_oracles = [
 # -----------------------------------------------------------------------------
 # disjunctive oracle
 # -----------------------------------------------------------------------------
-disjunctive_oracle = SplitOracle(master, Tuple(typical_oracles); param = oracle_param)
+disjunctive_oracle = SplitOracle(
+    master,
+    Tuple(typical_oracles);
+    normalization = LpDistanceNormalization(1.0),
+    param = oracle_param,
+)
 
 # -----------------------------------------------------------------------------
 # Benders preprocessing
@@ -134,11 +139,11 @@ user_callback = UserCallback(disjunctive_oracle; param=UserCallbackParam(frequen
 # BendersBnB
 # -----------------------------------------------------------------------------
 env = BendersBnB(
-    master,
-    preprocessing,
-    lazy_callback,
-    user_callback;
-    param = benders_param
+    master;
+    preprocessing = preprocessing,
+    lazy_callback = lazy_callback,
+    user_callback = user_callback,
+    param = benders_param,
 )
 
 # -----------------------------------------------------------------------------

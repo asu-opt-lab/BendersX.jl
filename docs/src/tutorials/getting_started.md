@@ -65,7 +65,7 @@ The following code block illustrates how to solve a CFLP instance using a sequen
 using BendersX
 using JuMP, CPLEX
 
-struct CFLPData <: AbstractData
+struct CFLPData
     n_facilities::Int
     n_customers::Int
     capacities::Vector{Float64}
@@ -124,12 +124,12 @@ Attach solvers through standard JuMP APIs such as `optimizer_with_attributes(...
 ## 2. Data 
 *Providing Instance Data to the Benders Engine*
 
-Users must define a subtype of `AbstractData` to store all problem-specific parameters required by the master and subproblem models. `BendersX.jl` does not impose any restrictions on the structure or fields of this type—any user-defined container is acceptable as long as it provides the information needed to build the models.
+Problem data can be stored in any Julia object that provides the parameters needed to construct the master and subproblem models.
 
 ### Example
 The [parameters](@ref cflp-parameter) of the Capacitated Facility Location Problem (CFLP) may be written as:
 ```julia
-struct CFLPData <: AbstractData
+struct CFLPData
     n_facilities::Int
     n_customers::Int
     capacities::Vector{Float64}
@@ -139,7 +139,7 @@ struct CFLPData <: AbstractData
 end
 ```
 ### Loading Data
-Users are responsible for loading and preprocessing raw instance data into their `AbstractData` subtype. A typical pattern is:
+Users are responsible for loading and preprocessing raw instance data into their chosen data container. A typical pattern is:
 ```julia
 read_data(path_to_raw_data) -> MyData
 ```
@@ -156,7 +156,7 @@ If you are unfamiliar with JuMP, please refer to the JuMP.jl documentation for a
 ### Master Modeling
 Users specify the master formulation by implementing a function of the form:
 ```julia
-update_master_model!(model::Model, data::AbstractData) -> NamedTuple, Vector{VariableRef}
+update_master_model!(model::Model, data) -> NamedTuple, Vector{VariableRef}
 ```
 Within this function, users use standard JuMP commands to declare master-level variables, constraints, and the objective.
 The function must return:
@@ -194,7 +194,7 @@ master = Master(
 ### Subproblem Modeling
 Subproblems are specified by the user through a model-update function:
 ```julia
-update_sub_model!(model::Model, data::AbstractData, scen_idx::Int; kwargs...)
+update_sub_model!(model::Model, data, scen_idx::Int; kwargs...)
 ```
 Here, `kwargs...` contains the symbolic names of the master variables that appear in the subproblem. This allows users to formulate the subproblem in JuMP **while referencing these master variables directly**, without explicitly adding them to the subproblem model.
 

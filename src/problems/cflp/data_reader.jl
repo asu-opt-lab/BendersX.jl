@@ -3,11 +3,11 @@ using JSON
 using LinearAlgebra
 
 """
-    CFLPData <: AbstractData
+    CFLPData
 
 Data container for the capacitated facility location problem.
 """
-struct CFLPData <: AbstractData
+struct CFLPData
     n_facilities::Int
     n_customers::Int
     capacities::Vector{Float64}

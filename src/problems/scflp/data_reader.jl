@@ -1,11 +1,11 @@
 using JSON
 
 """
-    SCFLPData <: AbstractData
+    SCFLPData
 
 Data container for the stochastic capacitated facility location problem.
 """
-struct SCFLPData <: AbstractData
+struct SCFLPData
     n_facilities::Int
     n_customers::Int
     n_scenarios::Int

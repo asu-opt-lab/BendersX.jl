@@ -9,53 +9,111 @@ include("callback/callback.jl") # must be included first
 
 Branch-and-bound Benders decomposition environment.
 
-`BendersBnB` integrates Benders cut generation into the MIP solver's branch-and-bound process through lazy-constraint and optional user-cut callbacks. Optionally, the LP relaxation of the master problem can be preprocessed to generate initial cuts before branch-and-bound begins.
+`BendersBnB` integrates Benders cut generation into the MIP solver's branch-and-bound process through lazy-constraint and optional user-cut callbacks. Integral candidate solutions are processed by a lazy-constraint callback, while an optional user-cut callback can separate fractional candidates. A preprocessing procedure can also be applied to the
+master before branch-and-bound begins.
 
 # Fields
 - `master::AbstractMaster`: Master problem.
 - `param::BendersBnBParam`: Parameters controlling algorithm, such as the time limit, relative gap tolerance, and verbosity.
-- `preprocessing::AbstractBendersPreprocessing`: Configuration for preprocessing the LP relaxation before branch-and-bound.
+- `preprocessing::AbstractPreprocessing`: Preprocessing procedure applied before branch-and-bound.
 - `lazy_callback::AbstractLazyCallback`: Configuration for lazy-constraint callback
 - `user_callback::AbstractUserCallback`: Configuration for user-cut callback
 - `obj_value::Float64`: Objective value of the best solution found
 - `termination_status::TerminationStatus`: Termination status of the Benders algorithm. See [`TerminationStatus`](@ref) for available statuses.
 
+# Constructors
+
+    BendersBnB(
+        master::AbstractMaster;
+        lazy_callback::AbstractLazyCallback,
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
+        user_callback::AbstractUserCallback = NoUserCallback(),
+        param::BendersBnBParam = BendersBnBParam(),
+    )
+
+Construct a `BendersBnB` environment from explicitly configured callback and preprocessing procedures. `lazy_callback` is required because it determines how integral candidates encountered during branch-and-bound are separated. Preprocessing and user-cut separation are optional.
+
+    BendersBnB(
+        master::AbstractMaster,
+        oracle::AbstractOracle;
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
+        param::BendersBnBParam = BendersBnBParam(),
+    )
+
+Convenience constructor for the common configuration. It constructs `LazyCallback(oracle)` for integral-candidate separation and uses `NoUserCallback()` for fractional candidates. The supplied `oracle` is used to construct the lazy callback; it is not stored separately by `BendersBnB`.
+
 # Examples
+
+A basic configuration uses an oracle for lazy separation, with no preprocessing or user callback:
+
 ```julia
 master = Master(data; model = update_master_model!)
 oracle = ClassicalOracle(data, master; model = update_sub_model!)
-env = BendersBnB(master, oracle)  # Use default setting with no preprocessing and no user callback
+env = BendersBnB(master, oracle)
 result = solve!(env)
 ```
 
-See also: [`BendersSeq`](@ref), [`AbstractBendersPreprocessing`](@ref), [`AbstractLazyCallback`](@ref), [`AbstractUserCallback`](@ref)
+For explicit control of callback behavior, construct the callbacks separately:
+```julia
+lazy_callback = LazyCallback(classical_oracle)
+
+user_callback = UserCallback(
+    disjunctive_oracle;
+    param = UserCallbackParam(frequency = 100),
+)
+
+env = BendersBnB(
+    master;
+    lazy_callback = lazy_callback,
+    preprocessing = preprocessing,
+    user_callback = user_callback,
+    param = bnb_param,
+)
+
+result = solve!(env)
+```
+
+The lazy and user callbacks may use different oracles.
+
+See also: [`BendersSeq`](@ref), [`AbstractPreprocessing`](@ref), [`AbstractLazyCallback`](@ref), [`AbstractUserCallback`](@ref), [`LazyCallback`](@ref), [`UserCallback`](@ref)
 """
 mutable struct BendersBnB <: AbstractBendersBnB
     master::AbstractMaster 
 
     param::BendersBnBParam 
 
-    preprocessing::AbstractBendersPreprocessing
+    preprocessing::AbstractPreprocessing
     lazy_callback::AbstractLazyCallback
     user_callback::AbstractUserCallback
 
     obj_value::Float64 
     termination_status::TerminationStatus 
 
-    function BendersBnB(master::AbstractMaster, oracle::AbstractTypicalOracle; param::BendersBnBParam = BendersBnBParam(), preprocessing::AbstractBendersPreprocessing = NoPreprocessing())
-        
-        lazy_callback = LazyCallback(oracle)
-        user_callback = NoUserCallback()
-        
-        new(master, param, preprocessing, lazy_callback, user_callback, Inf, NotSolved())
-    end
-
-    function BendersBnB(master::AbstractMaster, preprocessing::AbstractBendersPreprocessing, lazy_callback::AbstractLazyCallback, user_callback::AbstractUserCallback; param::BendersBnBParam = BendersBnBParam())
-        
+    function BendersBnB(
+        master::AbstractMaster;
+        lazy_callback::AbstractLazyCallback,
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
+        user_callback::AbstractUserCallback = NoUserCallback(),
+        param::BendersBnBParam = BendersBnBParam(),
+    )
         new(master, param, preprocessing, lazy_callback, user_callback, Inf, NotSolved())
     end
 end
 
+function BendersBnB(
+    master::AbstractMaster,
+    oracle::AbstractOracle;
+    preprocessing::AbstractPreprocessing = NoPreprocessing(),
+    param::BendersBnBParam = BendersBnBParam(),
+)
+    BendersBnB(
+        master;
+        lazy_callback = LazyCallback(oracle),
+        preprocessing = preprocessing,
+        user_callback = NoUserCallback(),
+        param = param
+    )
+end
 
 """
     solve!(env::BendersBnB) -> DataFrame

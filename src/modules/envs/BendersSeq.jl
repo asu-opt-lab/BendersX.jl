@@ -4,13 +4,13 @@
 
 Sequential Benders decomposition environment.
 
-`BendersSeq` implements the classical Benders cutting-plane algorithm by repeatedly solving the master problem, evaluating the oracle at the current candidate solution, adding the resulting Benders cuts to the master problem, and continuing until a termination criterion is satisfied. An optional [`AbstractBendersPreprocessing`](@ref) configuration can be applied before the cutting-plane iterations begin.
+`BendersSeq` implements the classical Benders cutting-plane algorithm by repeatedly solving the master problem, evaluating the oracle at the current candidate solution, adding the resulting Benders cuts to the master problem, and continuing until a termination criterion is satisfied. An optional [`AbstractPreprocessing`](@ref) configuration can be applied before the cutting-plane iterations begin.
 
 # Fields
 - `master::AbstractMaster`: Master problem
 - `oracle::AbstractOracle`: Oracle used for subproblem evaluation and cut generation.
 - `param::BendersSeqParam`: Parameters controlling the algorithm, such as time limit, gap tolerance, and verbosity
-- `preprocessing::AbstractBendersPreprocessing`: Configuration for optionally preprocessing the LP relaxation of the master problem before the Benders iterations.
+- `preprocessing::AbstractPreprocessing`: Configuration for optionally preprocessing the LP relaxation of the master problem before the Benders iterations.
 - `obj_value::Float64`: Objective value of the best solution found
 - `termination_status::TerminationStatus`: Termination status of the Benders algorithm. See [`TerminationStatus`](@ref) for available statuses.
 
@@ -20,7 +20,7 @@ Sequential Benders decomposition environment.
         master::AbstractMaster,
         oracle::AbstractOracle;
         param::BendersSeqParam = BendersSeqParam(),
-        preprocessing::AbstractBendersPreprocessing = NoPreprocessing(),
+        preprocessing::AbstractPreprocessing = NoPreprocessing(),
     )
 
 Construct a sequential Benders environment.
@@ -35,7 +35,7 @@ env = BendersSeq(master, oracle)  # Use default parameters
 df = solve!(env)
 ```
 
-See also: [`BendersSeqInOut`](@ref), [`BendersBnB`](@ref), [`AbstractBendersPreprocessing`](@ref)
+See also: [`BendersSeqInOut`](@ref), [`BendersBnB`](@ref), [`AbstractPreprocessing`](@ref)
 """
 mutable struct BendersSeq <: AbstractBendersSeq
     master::AbstractMaster
@@ -43,13 +43,13 @@ mutable struct BendersSeq <: AbstractBendersSeq
 
     param::BendersSeqParam
 
-    preprocessing::AbstractBendersPreprocessing
+    preprocessing::AbstractPreprocessing
 
     # result
     obj_value::Float64
     termination_status::TerminationStatus
 
-    function BendersSeq(master::AbstractMaster, oracle::AbstractOracle; param::BendersSeqParam = BendersSeqParam(), preprocessing::AbstractBendersPreprocessing = NoPreprocessing())
+    function BendersSeq(master::AbstractMaster, oracle::AbstractOracle; param::BendersSeqParam = BendersSeqParam(), preprocessing::AbstractPreprocessing = NoPreprocessing())
         new(master, oracle, param, preprocessing, Inf, NotSolved())
     end
 end

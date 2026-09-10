@@ -10,7 +10,7 @@ struct PreprocessingTestMaster <: BendersX.AbstractMaster
 end
 
 struct PreprocessingProbeException <: Exception end
-struct ThrowingPreprocessing <: BendersX.AbstractBendersPreprocessing end
+struct ThrowingPreprocessing <: BendersX.AbstractPreprocessing end
 
 BendersX.preprocess!(::BendersX.AbstractMaster, ::ThrowingPreprocessing; time_limit::Float64 = 100.0) =
     throw(PreprocessingProbeException())

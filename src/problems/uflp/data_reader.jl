@@ -1,10 +1,10 @@
 
 """
-    UFLPData <: AbstractData
+    UFLPData
 
 Data container for the uncapacitated facility location problem.
 """
-struct UFLPData <: AbstractData
+struct UFLPData
     n_facilities::Int
     n_customers::Int
     demands::Vector{Float64}

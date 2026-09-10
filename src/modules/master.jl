@@ -19,7 +19,7 @@ Master problem used in Benders decomposition.
 # Constructor
 
     Master(
-        data::AbstractData;
+        data;
         model = update_master_model!,
         optimizer = DEFAULT_OPTIMIZER,
     )
@@ -28,7 +28,7 @@ Construct a Benders master problem from `data`.
 
 # Arguments
 
-- `data::AbstractData`: Problem data used to formulate the master problem.
+- `data`: Problem data used to formulate the master problem. Any Julia object is accepted.
 - `model`: Function that builds the master model.
 - `optimizer`: JuMP-compatible optimizer constructor.
 """
@@ -43,7 +43,7 @@ mutable struct Master <: AbstractMaster
     c_x::Vector{Float64}
     c_t::Vector{Float64}
 
-    function Master(data::AbstractData; model=update_master_model!, optimizer = DEFAULT_OPTIMIZER)
+    function Master(data; model=update_master_model!, optimizer = DEFAULT_OPTIMIZER)
 
         @debug "Building Master module"
 

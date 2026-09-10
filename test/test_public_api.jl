@@ -3,7 +3,6 @@ using BendersX
 
 @testset "Public API Contract" begin
     exported = [
-        :AbstractData,
         :Master,
         :BendersSeq, :BendersSeqInOut, :BendersBnB,
         :ClassicalOracle, :UnifiedOracle, :ParetoOracle, :SeparableOracle,
@@ -31,7 +30,7 @@ using BendersX
         :AbstractBendersEnv, :AbstractBendersSeq, :AbstractBendersBnB,
         :AbstractMaster, :AbstractOracle, :AbstractOracleParam, :AbstractTypicalOracle,
         :AbstractDisjunctiveOracle,
-        :AbstractBendersPreprocessing,
+        :AbstractPreprocessing,
         :AbstractNormalization,
         :AbstractLazyCallback, :AbstractUserCallback,
         :AbstractLoopState, :AbstractLoopLog, :AbstractLoopParam,
@@ -60,6 +59,9 @@ using BendersX
 
     visible_names = Set(names(BendersX))
 
+    removed_data_supertype = Symbol("Abstract", "Data")
+    @test !isdefined(BendersX, removed_data_supertype)
+    @test !(removed_data_supertype in visible_names)
     @test !isdefined(BendersX, :set_parameter!)
 
     for sym in exported

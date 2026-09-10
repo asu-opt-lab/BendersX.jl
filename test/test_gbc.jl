@@ -29,7 +29,7 @@ using CPLEX
 #            y[i,j] <= x[i] for all i,j (facility open constraint - GBC)
 # =============================================================================
 
-struct SimpleAssignmentData <: AbstractData
+struct SimpleAssignmentData
     n_facilities::Int
     n_customers::Int
     costs::Matrix{Float64}

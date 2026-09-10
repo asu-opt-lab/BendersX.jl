@@ -1,6 +1,6 @@
 using JSON
 
-struct MCNDPData <: AbstractData
+struct MCNDPData
     num_nodes::Int
     num_arcs::Int
     num_commodities::Int

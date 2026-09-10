@@ -20,7 +20,6 @@ include("problems/problems.jl")
 # they must not decide visibility via `export` or `public`.
 
 # Default `using BendersX` workflow
-export AbstractData
 export Master
 export BendersSeq, BendersSeqInOut, BendersBnB
 export ClassicalOracle, UnifiedOracle, ParetoOracle, SeparableOracle
@@ -47,7 +46,7 @@ export NoDisjunctiveCuts, AllDisjunctiveCuts, DisjunctiveCutsSmallerIndices
 public AbstractBendersEnv, AbstractBendersSeq, AbstractBendersBnB
 public AbstractMaster
 public AbstractOracle, AbstractOracleParam, AbstractTypicalOracle, AbstractDisjunctiveOracle
-public AbstractBendersPreprocessing
+public AbstractPreprocessing
 public AbstractNormalization
 public AbstractLazyCallback, AbstractUserCallback
 public AbstractLoopState, AbstractLoopLog, AbstractLoopParam

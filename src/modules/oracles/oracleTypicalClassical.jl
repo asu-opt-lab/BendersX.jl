@@ -29,7 +29,7 @@ The user supplies the subproblem through a model-update function. To use general
 # Constructor
 
     ClassicalOracle(
-        data::AbstractData,
+        data,
         master::Master;
         model = update_sub_model!,
         scen_idx::Int = 0,
@@ -55,7 +55,7 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
     gbc_sense::Vector{GBCBoundType}
 
 
-    function ClassicalOracle(data::AbstractData, master::Master; 
+    function ClassicalOracle(data, master::Master;
                             model = update_sub_model!,
                             scen_idx::Int=0, 
                             param::ClassicalOracleParam = ClassicalOracleParam(),
