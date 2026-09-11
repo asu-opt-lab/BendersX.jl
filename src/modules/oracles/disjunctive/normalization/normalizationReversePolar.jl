@@ -28,9 +28,9 @@ The normalization direction can be determined from a core point and the current 
 
 Construct a reverse-polar normalization using either a core point or a fixed normalization direction.
 
-A core point and a fixed direction cannot be specified simultaneously. When a core point or direction is provided, both its `x` and `t` components must be specified and must have the same dimensions as the corresponding master variables. 
+A core point and a fixed direction cannot be specified simultaneously. When a core point or direction is provided, both its `x` and `t` components must be specified and must have the same dimensions as the corresponding oracle variables.
 
-When neither a core point nor a fixed direction is provided, the vertical direction `(core_direction_x = zeros(master.dim_x), core_direction_t = ones(master.dim_t))` is used by default. The default vertical direction is initialized when the normalization is prepared for a specific master. The validity of this direction is problem-dependent and is not guaranteed for all master formulations.
+When neither a core point nor a fixed direction is provided, a vertical direction with zeros in the `x` space and ones in the oracle's auxiliary-variable space is used by default. The default vertical direction is initialized when the normalization is prepared for a specific split oracle. Its validity is problem-dependent and is not guaranteed for all master formulations.
 
 See also: [`AbstractNormalization`](@ref), [`LpDistanceNormalization`](@ref), [`SplitOracle`](@ref)
 """
@@ -99,7 +99,7 @@ function add_normalization_constraint!(
     sx::AbstractVector{VariableRef},
     st::AbstractVector{VariableRef},
 )
-    initialize_reverse_polar!(normalization, master)
+    initialize_reverse_polar!(normalization, length(sx), length(st))
 
     @constraint(dcglp, con_reverse_polar_x[j in eachindex(sx)], sx[j] + 0.0 * tau == 0.0)
     @constraint(dcglp, con_reverse_polar_t[j in eachindex(st)], st[j] + 0.0 * tau == 0.0)
@@ -107,21 +107,25 @@ function add_normalization_constraint!(
     return nothing
 end
 
-function initialize_reverse_polar!(normalization::ReversePolarNormalization, master::AbstractMaster)
+function initialize_reverse_polar!(
+    normalization::ReversePolarNormalization,
+    dim_x::Int,
+    dim_t::Int,
+)
     if normalization.use_core_point
-        check_reverse_polar_dimension(normalization.core_point_x, master.dim_x, "core_point_x")
-        check_reverse_polar_dimension(normalization.core_point_t, master.dim_t, "core_point_t")
+        check_reverse_polar_dimension(normalization.core_point_x, dim_x, "core_point_x")
+        check_reverse_polar_dimension(normalization.core_point_t, dim_t, "core_point_t")
         return nothing
     end
 
     if normalization.core_direction_x === nothing && normalization.core_direction_t === nothing
-        normalization.core_direction_x = zeros(master.dim_x)
-        normalization.core_direction_t = ones(master.dim_t)
+        normalization.core_direction_x = zeros(dim_x)
+        normalization.core_direction_t = ones(dim_t)
         return nothing
     end
 
-    check_reverse_polar_dimension(normalization.core_direction_x, master.dim_x, "core_direction_x")
-    check_reverse_polar_dimension(normalization.core_direction_t, master.dim_t, "core_direction_t")
+    check_reverse_polar_dimension(normalization.core_direction_x, dim_x, "core_direction_x")
+    check_reverse_polar_dimension(normalization.core_direction_t, dim_t, "core_direction_t")
     return nothing
 end
 
