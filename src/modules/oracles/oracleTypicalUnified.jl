@@ -152,8 +152,6 @@ mutable struct UnifiedOracle <: AbstractTypicalOracle
     UnifiedOracle() = new()
 end
 
-auxiliary_dimension(::UnifiedOracle) = 1
-
 """
     _apply_unified_transformations!(oracle::UnifiedOracle, fixed_x_vars::Vector{VariableRef})
 

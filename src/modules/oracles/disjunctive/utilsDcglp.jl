@@ -4,14 +4,13 @@
         master::AbstractMaster,
         normalization::AbstractNormalization,
         param::SplitOracleParam,
-        ; dim_t = master.dim_t,
+        ; dim_t,
     )
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
 The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization constraint defined by `normalization`.
-`dim_t` controls the auxiliary-variable dimension of the DCGLP and defaults to
-the master's full `t` dimension.
+`dim_t` controls the auxiliary-variable dimension of the DCGLP.
 
 Returns the constructed JuMP model.
 """
@@ -20,7 +19,7 @@ function build_dcglp(
     normalization::AbstractNormalization,
     param::SplitOracleParam,
     ;
-    dim_t::Int = master.dim_t,
+    dim_t::Int,
 )
     dcglp, tau, sx, st = build_dcglp_base(master, param; dim_t = dim_t)
 
@@ -33,7 +32,7 @@ end
     build_dcglp_base(
         master::AbstractMaster,
         param::SplitOracleParam,
-        ; dim_t = master.dim_t,
+        ; dim_t,
     )
 
 Build the common DCGLP formulation shared by all normalization schemes.
@@ -51,7 +50,7 @@ function build_dcglp_base(
     master::AbstractMaster,
     param::SplitOracleParam,
     ;
-    dim_t::Int = master.dim_t,
+    dim_t::Int,
 )
     dim_t > 0 || throw(ArgumentError("build_dcglp_base: `dim_t` must be positive."))
     dcglp = Model(param.dcglp_param.optimizer)

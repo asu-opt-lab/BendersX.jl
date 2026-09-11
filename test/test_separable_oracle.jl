@@ -127,8 +127,6 @@ struct SeparableContractOracle <: BendersX.AbstractTypicalOracle
     is_in_L::Bool
 end
 
-BendersX.auxiliary_dimension(::SeparableContractOracle) = 1
-
 struct AuxiliaryDimensionTestOracle <: BendersX.AbstractTypicalOracle
     dimension::Int
 end

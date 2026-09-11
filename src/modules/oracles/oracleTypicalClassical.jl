@@ -87,8 +87,6 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
     ClassicalOracle() = new()
 end
 
-auxiliary_dimension(::ClassicalOracle) = 1
-
 """
     generate_cuts(
         oracle::ClassicalOracle,

@@ -48,9 +48,8 @@ is_typical_oracle(::AbstractTypicalOracle) = true
 
 Return the number of auxiliary variables consumed by `oracle`.
 
-Every concrete oracle must implement this interface. Scalar typical oracles
-return `1`, while composite oracles return the dimension of the auxiliary
-space represented by their components.
+Typical oracles use one auxiliary variable by default. Oracles representing a
+different auxiliary space override this method.
 """
 function auxiliary_dimension(oracle::AbstractOracle)
     throw(
@@ -59,6 +58,8 @@ function auxiliary_dimension(oracle::AbstractOracle)
         ),
     )
 end
+
+auxiliary_dimension(::AbstractTypicalOracle) = 1
 
 # ---------------------------------------------------------------------------- 
 # Basic oracle parameters
