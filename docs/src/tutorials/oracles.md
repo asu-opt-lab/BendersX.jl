@@ -126,6 +126,36 @@ block, so child cut histories remain local. Scalar scenario oracles use blocks
 of length one, while grouped oracles such as `UFLKnapsackOracle` may use larger
 blocks.
 
+### SUFLP with customer-disaggregated scenario blocks
+
+For [`SUFLPData`](@ref), [`update_knapsack_master_model!`](@ref) creates
+`t[customer, scenario]` and returns `vec(t)`. Julia's column-major ordering
+therefore keeps all customers of one scenario in a contiguous block. A
+scenario-aware `UFLKnapsackOracle` reports a block size equal to the number of
+customers, and `SeparableOracle` combines those blocks automatically:
+
+```julia
+master = Master(data; model = update_knapsack_master_model!)
+oracle = SeparableOracle(
+    data,
+    master,
+    UFLKnapsackOracle,
+    data.n_scenarios;
+    sub_oracle_param = UFLKnapsackOracleParam(
+        add_only_violated_cuts = true,
+    ),
+)
+env = BendersSeq(master, oracle)
+solve!(env)
+```
+
+Scenario probabilities appear only as coefficients of the master auxiliary
+variables. The scenario subproblems and knapsack oracles return unweighted
+recourse values, avoiding accidental double weighting. To use local
+disjunctive separation, construct one `SplitOracle` from two scenario-specific
+`UFLKnapsackOracle`s for each scenario, then wrap those split oracles in the
+outer `SeparableOracle`.
+
 !!! note
     `SeparableOracle` evaluates subproblems with Julia threads. The default GLPK
     optimizer is allowed, but GLPK may raise solver-internal errors during

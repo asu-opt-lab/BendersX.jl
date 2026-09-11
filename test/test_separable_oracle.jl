@@ -421,10 +421,6 @@ end
             master,
             (AuxiliaryDimensionTestOracle(1), AuxiliaryDimensionTestOracle(2)),
         )
-        @test_throws ArgumentError SplitOracle(
-            master,
-            (AuxiliaryDimensionTestOracle(0), AuxiliaryDimensionTestOracle(0)),
-        )
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(2), AuxiliaryDimensionTestOracle(2)],

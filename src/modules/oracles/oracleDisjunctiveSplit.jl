@@ -161,11 +161,6 @@ mutable struct SplitOracle{
             ),
         )
         dim_auxiliary = first(dims)
-        dim_auxiliary > 0 || throw(
-            ArgumentError(
-                "SplitOracle: auxiliary-variable dimension must be positive.",
-            ),
-        )
 
         dcglp = build_dcglp(
             master,

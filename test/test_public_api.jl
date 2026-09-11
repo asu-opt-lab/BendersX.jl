@@ -19,11 +19,12 @@ using BendersX
         :RandomFractional, :MostFractional, :LargestFractional,
         :NoDisjunctiveCuts, :AllDisjunctiveCuts, :DisjunctiveCutsSmallerIndices,
         :update_master_model!, :update_sub_model!,
-        :CFLPData, :UFLPData, :SCFLPData, :SNIPData,
+        :CFLPData, :UFLPData, :SCFLPData, :SUFLPData, :SNIPData,
         :CFLKnapsackOracle, :CFLKnapsackOracleParam, :UFLKnapsackOracle, :UFLKnapsackOracleParam,
         :read_GK_data, :read_cfl_file, :read_cflp_benchmark_data,
         :read_uflp_benchmark_data, :read_Simple_data,
         :read_stochastic_capacited_facility_location_problem, :read_snip_data,
+        :read_stochastic_uncapacitated_facility_location_problem,
     ]
 
     public_only = [

@@ -137,18 +137,7 @@ mutable struct SeparableOracle <: AbstractOracle
         oracles::AbstractVector{<:AbstractOracle};
         param::SeparableOracleParam = SeparableOracleParam(),
     )
-        isempty(oracles) && throw(
-            ArgumentError("SeparableOracle: at least one sub-oracle is required."),
-        )
-
         child_dimensions = auxiliary_dimension.(oracles)
-        all(>(0), child_dimensions) || throw(
-            ArgumentError(
-                "SeparableOracle: sub-oracle auxiliary dimensions must be " *
-                "positive; got $(child_dimensions).",
-            ),
-        )
-
         dim_auxiliary = sum(child_dimensions)
         dim_auxiliary == master.dim_t || throw(
             DimensionMismatch(

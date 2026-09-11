@@ -68,12 +68,13 @@ public TimeLimitException, UnexpectedModelStatusException, UnimplementedInterfac
 public AlgorithmException, UnsupportedModelException
 
 # Problem-specific helpers available via `using BendersX`
-export CFLPData, UFLPData, SCFLPData, SNIPData
+export CFLPData, UFLPData, SCFLPData, SUFLPData, SNIPData
 export CFLKnapsackOracle, CFLKnapsackOracleParam
 export UFLKnapsackOracle, UFLKnapsackOracleParam
 export read_GK_data, read_cfl_file, read_cflp_benchmark_data
 export read_uflp_benchmark_data, read_Simple_data
 export read_stochastic_capacited_facility_location_problem, read_snip_data
+export read_stochastic_uncapacitated_facility_location_problem
 export update_knapsack_master_model!, update_sub_gbc_model!
 
 end # module BendersX
