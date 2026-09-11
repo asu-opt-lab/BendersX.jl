@@ -14,7 +14,7 @@ When calling
 
     SeparableOracle(data, master, T, N; ...)
 
-`SeparableOracle` constructs one oracle of type `T` for each of the `N` subproblems. To support this form of construction, `T` must implement the constructor above. For subproblem `j`, `SeparableOracle` calls the constructor with `scen_idx = j`.
+`SeparableOracle` constructs one oracle of type `T` for each subproblem selected by `indices` (all `1:N` by default). To support this form of construction, `T` must implement the constructor above. For global subproblem `j`, `SeparableOracle` calls the constructor with `scen_idx = j`.
 
 This constructor is required only for automatic homogeneous construction. It is not part of the general [`AbstractOracle`](@ref) interface. Oracles that do not implement this constructor can still be used with `SeparableOracle` by constructing them explicitly and passing them to
 
@@ -57,7 +57,7 @@ Throws an [`UnimplementedInterfaceException`](@ref) when a subtype `T` does not 
 
 Parameters controlling [`SeparableOracle`](@ref).
 
-This parameter container is currently empty and serves as an extension point for future controls related to scenario handling or parallel evaluation.
+This parameter container is currently empty and serves as an extension point for future controls related to separable-subproblem evaluation.
 
 Parameters of the individual sub-oracles are stored by those oracles rather than by `SeparableOracle`.
 
@@ -72,56 +72,68 @@ end
 
 Composite oracle for problems with multiple independent subproblems.
 
-`SeparableOracle` contains one [`AbstractOracle`](@ref) for each independent
-subproblem and evaluates these oracles in parallel. Each sub-oracle evaluates
-the common linking-variable candidate and its corresponding block of auxiliary
-variables. The resulting cuts are copied and embedded in the full auxiliary
-space without modifying the child oracle's cuts.
+`SeparableOracle` composes separation across a collection of independent
+subproblems. An instance may represent all subproblems or a subset of them.
+Each contained sub-oracle evaluates the common linking-variable candidate and
+its corresponding block of the global auxiliary vector. Generated cuts are
+copied and embedded in the full auxiliary space.
 
-Sub-oracles may have different concrete types and parameter objects.
+Sub-oracles may have different concrete types, parameter objects, and auxiliary-variable dimensions.
 
 # Fields
 param::SeparableOracleParam: Parameters controlling separable evaluation.
-oracles::Vector{AbstractOracle}: One configured oracle per subproblem.
-auxiliary_ranges::Vector{UnitRange{Int}}: Position of each sub-oracle's
-auxiliary-variable block in the full auxiliary space.
-dim_auxiliary::Int: Total auxiliary-variable dimension represented by all
-sub-oracles.
+oracles::Vector{AbstractOracle}: Configured oracles for the represented subproblems.
+indices::Vector{Int}: Global subproblem indices represented by the local oracles.
+auxiliary_ranges::Vector{UnitRange{Int}}: Global auxiliary-variable block of each
+local sub-oracle.
+dim_auxiliary::Int: Total auxiliary-variable dimension represented by the contained sub-oracles.
+dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the master.
 
 # Constructors
 
     SeparableOracle(
         master::AbstractMaster,
         oracles::AbstractVector{<:AbstractOracle};
+        indices = 1:length(oracles),
+        auxiliary_ranges = nothing,
         param = SeparableOracleParam(),
     )
 
-Construct a `SeparableOracle` from already configured sub-oracles.
+Construct a `SeparableOracle` from already configured sub-oracles. When
+`auxiliary_ranges` is omitted, the supplied oracles must represent the full
+auxiliary space and their ranges are inferred consecutively. For a partitioned
+oracle, pass the global `indices` and the corresponding global
+`auxiliary_ranges`.
 
     SeparableOracle(
         data,
         master::AbstractMaster,
         oracle_type::Type{T},
         N::Int;
+        indices = 1:N,
+        auxiliary_ranges = nothing,
         model = update_sub_model!,
         sub_oracle_param = BasicOracleParam(),
         param = SeparableOracleParam(),
         optimizer = DEFAULT_OPTIMIZER,
     ) where T <: AbstractOracle
 
-Convenience constructor for the common case in which all `N` subproblems use
-the same oracle type and configuration. It constructs one oracle for each
-subproblem using `scen_idx = 1:N`. The same `sub_oracle_param` and `model`
-function are passed to every sub-oracle.
+Homogeneous convenience constructor. By default, it constructs one oracle for
+each of the `N` subproblems. A subset can be constructed by specifying global
+`indices`. For a subset, `auxiliary_ranges` must give the corresponding blocks
+in the full master auxiliary space. The same `sub_oracle_param` and `model`
+function are passed to every constructed sub-oracle.
 
-The sum of the sub-oracles' [`auxiliary_dimension`](@ref) values must equal
-`master.dim_t`. Scalar sub-oracles therefore use one auxiliary variable each,
-while a sub-oracle such as `UFLKnapsackOracle` may own a multi-variable block.
+For a full `SeparableOracle`, the sum of the sub-oracles'
+[`auxiliary_dimension`](@ref) values must equal `master.dim_t`. For a
+partitioned instance, each supplied global auxiliary range must have the same
+length as the corresponding sub-oracle's auxiliary dimension.
 
 # Throws
 
-Throws a `DimensionMismatch` if the total auxiliary-variable dimension of the
-sub-oracles does not equal `master.dim_t`.
+Throws a `DimensionMismatch` or `ArgumentError` when the subproblem indices or
+auxiliary ranges are inconsistent with the supplied sub-oracles or the master
+auxiliary space.
 
 See also: [`AbstractOracle`](@ref), [`generate_cuts`](@ref)
 """
@@ -129,39 +141,87 @@ mutable struct SeparableOracle <: AbstractOracle
     param::SeparableOracleParam 
 
     oracles::Vector{AbstractOracle}
+    indices::Vector{Int}
     auxiliary_ranges::Vector{UnitRange{Int}}
     dim_auxiliary::Int
+    dim_global_auxiliary::Int
 
     function SeparableOracle(
         master::AbstractMaster,
         oracles::AbstractVector{<:AbstractOracle};
+        indices::AbstractVector{<:Integer} = collect(1:length(oracles)),
+        auxiliary_ranges = nothing,
         param::SeparableOracleParam = SeparableOracleParam(),
     )
+        indices = Int.(indices)
+        n_local = length(oracles)
+
+        # check the validity of the supplied indices
+        length(indices) == n_local || throw(DimensionMismatch(
+            "SeparableOracle: number of indices ($(length(indices))) must equal " *
+            "number of sub-oracles ($n_local).",
+        ))
+        length(unique(indices)) == length(indices) || throw(ArgumentError(
+            "SeparableOracle: subproblem indices must be unique.",
+        ))
+        all(>(0), indices) || throw(ArgumentError(
+            "SeparableOracle: subproblem indices must be positive.",
+        ))
+
+        # check the validity of the supplied auxiliary ranges
         child_dimensions = auxiliary_dimension.(oracles)
+        all(>(0), child_dimensions) || throw(ArgumentError(
+            "SeparableOracle: every sub-oracle must have positive auxiliary dimension.",
+        ))
         dim_auxiliary = sum(child_dimensions)
-        dim_auxiliary == master.dim_t || throw(
-            DimensionMismatch(
-                "SeparableOracle: sub-oracles represent $dim_auxiliary " *
-                "auxiliary variables, but " *
-                "master.dim_t ($(master.dim_t))."
-            )
-        )
+        if auxiliary_ranges === nothing
+            # Without an explicit global mapping, the supplied children must
+            # represent the complete auxiliary space in consecutive order.
+            dim_auxiliary == master.dim_t || throw(DimensionMismatch(
+                "SeparableOracle: supplied sub-oracles represent $dim_auxiliary auxiliary " *
+                "variables, but master.dim_t is $(master.dim_t). For a partitioned " *
+                "SeparableOracle, provide the corresponding global auxiliary_ranges.",
+            ))
+            auxiliary_ends = cumsum(child_dimensions)
+            ranges = UnitRange{Int}[
+                (auxiliary_ends[k] - child_dimensions[k] + 1):auxiliary_ends[k]
+                for k in eachindex(child_dimensions)
+            ]
+        else
+            length(auxiliary_ranges) == n_local || throw(DimensionMismatch(
+                "SeparableOracle: number of auxiliary ranges " *
+                "($(length(auxiliary_ranges))) must equal number of sub-oracles ($n_local).",
+            ))
+            ranges = UnitRange{Int}[first(r):last(r) for r in auxiliary_ranges]
+            for k in eachindex(ranges)
+                length(ranges[k]) == child_dimensions[k] || throw(DimensionMismatch(
+                    "SeparableOracle: subproblem $(indices[k]) has auxiliary dimension " *
+                    "$(child_dimensions[k]), but its global auxiliary range $(ranges[k]) " *
+                    "has length $(length(ranges[k])).",
+                ))
+                first(ranges[k]) >= 1 && last(ranges[k]) <= master.dim_t || throw(ArgumentError(
+                    "SeparableOracle: auxiliary range $(ranges[k]) lies outside " *
+                    "1:$(master.dim_t).",
+                ))
+            end
+            occupied = reduce(vcat, collect.(ranges); init = Int[])
+            length(unique(occupied)) == length(occupied) || throw(ArgumentError(
+                "SeparableOracle: auxiliary ranges must not overlap.",
+            ))
+        end
 
-        auxiliary_ends = cumsum(child_dimensions)
-        auxiliary_ranges = UnitRange{Int}[
-            (auxiliary_ends[j] - child_dimensions[j] + 1):auxiliary_ends[j]
-            for j in eachindex(child_dimensions)
-        ]
-
-        @info "SeparableOracle: N=$(length(oracles)) subproblems, " *
-              "dim_auxiliary=$dim_auxiliary, " *
+        @info "SeparableOracle: $(n_local) assigned subproblems, " *
+              "dim_auxiliary=$(dim_auxiliary), " *
+              "dim_global_auxiliary=$(master.dim_t), " *
               "$(Threads.nthreads()) threads available for parallel execution"
 
         new(
             param,
             AbstractOracle[oracles...],
-            auxiliary_ranges,
+            indices,
+            ranges,
             dim_auxiliary,
+            master.dim_t,
         )
     end
 end
@@ -171,29 +231,41 @@ function SeparableOracle(
         master::AbstractMaster,
         oracle_type::Type{T},
         N::Int;
+        indices::AbstractVector{<:Integer} = collect(1:N),
+        auxiliary_ranges = nothing,
         model = update_sub_model!,
         sub_oracle_param::AbstractOracleParam = BasicOracleParam(),
         param::SeparableOracleParam = SeparableOracleParam(),
         optimizer = DEFAULT_OPTIMIZER,
-        ) where {T <: AbstractOracle}
+    ) where {T <: AbstractOracle}
+        indices = Int.(indices)
+        length(unique(indices)) == length(indices) || throw(ArgumentError(
+            "SeparableOracle: subproblem indices must be unique.",
+        ))
+        N == length(indices) || throw(DimensionMismatch(
+            "SeparableOracle: number of indices ($(length(indices))) must equal " *
+            "number of sub-oracles ($N).",
+        ))
 
-            oracles = [
-                oracle_type(
-                    data,
-                    master;
-                    model = model,
-                    scen_idx = j,
-                    param = deepcopy(sub_oracle_param),
-                    optimizer = optimizer,
-                )
-                for j in 1:N
-            ]
-
-            return SeparableOracle(
-                master,
-                oracles;
-                param = param,
+        oracles = [
+            oracle_type(
+                data,
+                master;
+                model = model,
+                scen_idx = j,
+                param = deepcopy(sub_oracle_param),
+                optimizer = optimizer,
             )
+            for j in indices
+        ]
+
+        return SeparableOracle(
+            master,
+            oracles;
+            indices = indices,
+            auxiliary_ranges = auxiliary_ranges,
+            param = param,
+        )
 end
 
 is_typical_oracle(oracle::SeparableOracle) =
@@ -205,7 +277,7 @@ function embed_local_cut(
     h::Hyperplane,
     child_index::Int,
     auxiliary_range::UnitRange{Int},
-    dim_auxiliary::Int,
+    dim_global_auxiliary::Int,
     dim_x::Int,
 )
     length(h.a_x) == dim_x || throw(
@@ -222,7 +294,7 @@ function embed_local_cut(
         ),
     )
 
-    embedded = Hyperplane(dim_x, dim_auxiliary)
+    embedded = Hyperplane(dim_x, dim_global_auxiliary)
     embedded.a_x = copy(h.a_x)
     local_indices, local_values = findnz(h.a_t)
     offset = first(auxiliary_range) - 1
@@ -242,55 +314,61 @@ end
         time_limit = 3600.0,
     )
 
-Generate Benders cuts by evaluating all sub-oracles in parallel.
+Generate Benders cuts by evaluating the sub-oracles represented by this
+`SeparableOracle` in parallel.
 
-Each sub-oracle is evaluated at the common candidate `x_value` and its
-corresponding block of `t_value`. Generated cuts are expanded to the full `t`
-dimension and associated with the corresponding subproblem. Sub-oracles may
-represent different positive auxiliary-variable dimensions.
+Each local sub-oracle is evaluated at the common candidate `x_value` and its
+corresponding local block of the global `t_value`. Generated cuts are embedded
+in the full global auxiliary space. The returned `sub_obj_vals` concatenate the local
+subproblem objective values in the order of `oracle.indices`; the caller can
+use `oracle.auxiliary_ranges` (or an externally known partition mapping) to
+place them in a global vector.
 
-If any sub-oracle separates the candidate, the generated cuts and subproblem objective values are returned collectively. Otherwise, the candidate is reported as belonging to the separable oracle's feasible region.
+Returns `(is_in_L, hyperplanes, sub_obj_vals)`, where `is_in_L` indicates whether the candidate is reported as belonging to the feasible regions of all sub-oracles.
 """
 function generate_cuts(oracle::SeparableOracle, x_value::Vector{Float64}, t_value::Vector{Float64}; tol_normalize = 1.0, time_limit = 3600.0)
     tic = time()
-    N = length(oracle.oracles)
+    n_local = length(oracle.oracles)
     dim_auxiliary = auxiliary_dimension(oracle)
-    length(t_value) == dim_auxiliary || throw(
-        DimensionMismatch(
-            "SeparableOracle received t_value with length $(length(t_value)); " *
-            "expected $dim_auxiliary.",
-        ),
-    )
-    is_in_L = Vector{Bool}(undef,N)
-    sub_obj_val = Vector{Vector{Float64}}(undef,N)
-    hyperplanes = Vector{Vector{Hyperplane}}(undef,N)
+    dim_global_auxiliary = oracle.dim_global_auxiliary
+
+    length(t_value) == dim_global_auxiliary || throw(DimensionMismatch(
+        "SeparableOracle received t_value with length $(length(t_value)); " *
+        "expected $dim_global_auxiliary.",
+    ))
+
+    local_is_in_L = Vector{Bool}(undef, n_local)
+    sub_obj_vals = Vector{Vector{Float64}}(undef, n_local)
+    hyperplanes = Vector{Vector{Hyperplane}}(undef, n_local)
 
     try
-        Threads.@threads for j=1:N
-            auxiliary_range = oracle.auxiliary_ranges[j]
+        Threads.@threads for k=1:n_local
+            global_index = oracle.indices[k]
+            auxiliary_range = oracle.auxiliary_ranges[k]
             child_dimension = length(auxiliary_range)
-            child_is_in_L, child_hyperplanes, child_obj_val = generate_cuts(
-                oracle.oracles[j],
+
+            child_is_in_L, child_hyperplanes, child_obj_vals = generate_cuts(
+                oracle.oracles[k],
                 x_value,
                 t_value[auxiliary_range];
                 tol_normalize = tol_normalize,
                 time_limit = get_sec_remaining(tic, time_limit),
             )
-            length(child_obj_val) == child_dimension || throw(
+            length(child_obj_vals) == child_dimension || throw(
                 DimensionMismatch(
-                    "SeparableOracle child $j returned $(length(child_obj_val)) " *
-                    "objective values; expected $child_dimension.",
+                    "SeparableOracle subproblem $global_index returned " *
+                    "$(length(child_obj_vals)) objective values; expected $child_dimension.",
                 ),
             )
 
-            is_in_L[j] = child_is_in_L
-            sub_obj_val[j] = child_obj_val
-            hyperplanes[j] = [
+            local_is_in_L[k] = child_is_in_L
+            sub_obj_vals[k] = child_obj_vals
+            hyperplanes[k] = [
                 embed_local_cut(
                     h,
-                    j,
+                    global_index,
                     auxiliary_range,
-                    dim_auxiliary,
+                    dim_global_auxiliary,
                     length(x_value),
                 ) for h in child_hyperplanes
             ]
@@ -301,13 +379,16 @@ function generate_cuts(oracle::SeparableOracle, x_value::Vector{Float64}, t_valu
         task_failure isa TaskFailedException || rethrow()
         failures = current_exceptions(task_failure.task; backtrace = false)
         isempty(failures) && rethrow()
-        failure = first(failures)
-        throw(failure.exception)
+        throw(first(failures).exception)
     end
 
-    if any(.!is_in_L)
-        return false, reduce(vcat, hyperplanes), reduce(vcat, sub_obj_val)
-    else
-        return true, [Hyperplane(length(x_value), length(t_value))], reduce(vcat, sub_obj_val)
+    cuts = reduce(vcat, hyperplanes; init = Hyperplane[])
+    values = reduce(vcat, sub_obj_vals; init = Float64[])
+    is_in_L = all(local_is_in_L)
+
+    if is_in_L
+        cuts = [Hyperplane(length(x_value), dim_global_auxiliary)]
     end
+
+    return is_in_L, cuts, values
 end

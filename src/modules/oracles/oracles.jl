@@ -46,10 +46,10 @@ is_typical_oracle(::AbstractTypicalOracle) = true
 """
     auxiliary_dimension(oracle::AbstractOracle) -> Int
 
-Return the number of auxiliary variables consumed by `oracle`.
+Return the dimension of the auxiliary-variable space represented by `oracle`.
 
-Typical oracles use one auxiliary variable by default. Oracles representing a
-different auxiliary space override this method.
+Concrete subtypes of `AbstractTypicalOracle` have auxiliary dimension one by default. Oracles representing
+a higher-dimensional auxiliary space must override this method.
 """
 function auxiliary_dimension(oracle::AbstractOracle)
     throw(
