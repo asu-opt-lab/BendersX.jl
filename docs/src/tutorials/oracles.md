@@ -100,16 +100,22 @@ required constructor interface can be used as the template.
 
 `SeparableOracle` can also wrap explicitly constructed oracles, including
 disjunctive oracles. A per-scenario split construction gives every scenario
-its own one-dimensional DCGLP:
+its own `SplitOracle` while each DCGLP retains the global auxiliary space:
 
 ```julia
 split_oracles = [
     begin
-        kappa = ClassicalOracle(data, master; scen_idx = j)
-        nu = ClassicalOracle(data, master; scen_idx = j)
+        typical_pair = ntuple(2) do _
+            SeparableOracle(
+                master,
+                [ClassicalOracle(data, master; scen_idx = j)];
+                indices = [j],
+                auxiliary_ranges = [j:j],
+            )
+        end
         SplitOracle(
             master,
-            (kappa, nu);
+            typical_pair;
             param = deepcopy(split_param),
         )
     end
@@ -119,12 +125,12 @@ split_oracles = [
 oracle = SeparableOracle(master, split_oracles)
 ```
 
-Each child declares how many local `t` values it consumes through
-`auxiliary_dimension`. The wrapper assigns each child a contiguous block of
-the global `t`, copies each returned cut, and embeds its local `a_t` into that
-block, so child cut histories remain local. Scalar scenario oracles use blocks
-of length one, while grouped oracles such as `UFLKnapsackOracle` may use larger
-blocks.
+Each component declares the number of represented `t` values through
+`auxiliary_dimension`. For leaf components, the wrapper extracts the assigned
+block of the global `t` and embeds each returned cut into the master auxiliary
+space. Contained `SeparableOracle`s and `SplitOracle`s already receive the
+global `t` and return global cuts. Their grouped `indices`, such as
+`[[1, 2], [3, 4]]`, record which subproblems belong to each component.
 
 ### SUFLP with customer-disaggregated scenario blocks
 
@@ -152,9 +158,10 @@ solve!(env)
 Scenario probabilities appear only as coefficients of the master auxiliary
 variables. The scenario subproblems and knapsack oracles return unweighted
 recourse values, avoiding accidental double weighting. To use local
-disjunctive separation, construct one `SplitOracle` from two scenario-specific
-`UFLKnapsackOracle`s for each scenario, then wrap those split oracles in the
-outer `SeparableOracle`.
+disjunctive separation, first place each scenario-specific oracle in a
+one-component `SeparableOracle` carrying that scenario's global auxiliary
+block. Construct a `SplitOracle` from two matching components for each
+scenario, then combine those split oracles in the outer `SeparableOracle`.
 
 !!! note
     `SeparableOracle` evaluates subproblems with Julia threads. The default GLPK
@@ -210,15 +217,20 @@ can be any typical oracles that are compatible with the subproblem.
 
 These two composition orders have different meanings:
 
-- `SplitOracle(Separable typical oracles)` builds one global DCGLP, so a cut
-  may involve several `t[j]` components.
-- `SeparableOracle(per-scenario SplitOracles)` builds one local DCGLP per
-  scenario, so every generated cut acts only on that scenario's `t[j]`.
+- `SplitOracle(SeparableOracle(...), SeparableOracle(...))` always builds its
+  DCGLP in the master's global auxiliary space. Matching component oracles
+  determine which `t[j]` coordinates are active; returned cuts have zero
+  coefficients outside those coordinates.
+- `SeparableOracle` containing several `SplitOracle`s evaluates one global-space
+  DCGLP per assigned group and directly combines the returned global cuts.
 
-`SplitOracle` obtains its auxiliary-variable dimension from its component
-oracles. Scalar typical oracles such as `ClassicalOracle` report dimension
-one, while `SeparableOracle` reports the sum of its component-oracle
-dimensions. The two component oracles must report the same dimension.
+`SplitOracle` obtains the number of represented auxiliary variables from its
+component oracles, while the DCGLP dimension remains `master.dim_t`. A typical
+oracle uses dimension one by default and overrides `auxiliary_dimension` only
+when it represents a larger auxiliary space. `SeparableOracle` reports the sum
+of its component-oracle dimensions. The two components of a `SplitOracle` must
+report the same dimension and, when they are `SeparableOracle`s, must carry
+identical `indices` and `auxiliary_ranges`.
 
 ### Configuring `SplitOracle` Behavior
 

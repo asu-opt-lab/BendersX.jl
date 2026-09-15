@@ -9,8 +9,9 @@
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
-The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization constraint defined by `normalization`.
-`dim_t` controls the auxiliary-variable dimension of the DCGLP.
+The method first constructs the common global-auxiliary DCGLP formulation
+through `build_dcglp_base`, then adds the normalization constraint defined by
+`normalization`. `dim_t` is the master's complete auxiliary dimension.
 
 Returns the constructed JuMP model.
 """
@@ -37,7 +38,9 @@ end
 
 Build the common DCGLP formulation shared by all normalization schemes.
 
-The method creates the disjunctive variables for the two sides of the split, transfers supported linear constraints and bounds from the master problem, and introduces the auxiliary variables `tau`, `sx`, and `st` used by the normalization.
+The method creates global auxiliary variables for the two sides of the split,
+transfers supported linear constraints and bounds from the master problem, and
+introduces the variables `tau`, `sx`, and `st` used by the normalization.
 
 Normalization-specific constraints are not added by this method.
 
@@ -282,14 +285,17 @@ function solve_dcglp!(
                 oracle.param,
                 zero_indices,
                 one_indices,
+                oracle.active_t_indices,
             )
             oracle.param.dcglp_param.verbose && print_disjunctive_cut(oracle, cut, x_value, t_value; zero_tol = oracle.param.zero_tol)
             store_dcglp_disjunctive_cut!(oracle, cut, hyperplanes)
-            return false, hyperplanes, fill(Inf, length(t_value))
+            return false, hyperplanes, fill(Inf, oracle.dim_auxiliary)
         end
 
         if all(log.iterations[end].is_in_L) # optimal termination with both points in the oracle feasible region
-            return true, [Hyperplane(length(x_value), length(t_value))], deepcopy(t_value)
+            return true,
+                   [Hyperplane(length(x_value), length(t_value))],
+                   deepcopy(t_value[oracle.active_t_indices])
         end
 
         # fallback to typical oracle since no meaningful disjunctive cut can be constructed from the DCGLP solution
@@ -353,13 +359,15 @@ function collect_dcglp_benders_cuts!(
         state.oracle_times[i] = @elapsed begin
             if state.values[:ω_0][i] >= oracle.param.zero_tol
                 t_prime = state.values[:ω_t][i] ./ state.values[:ω_0][i]
-                state.is_in_L[i], hyperplanes_i, state.f_x[i] = generate_cuts(
+                state.is_in_L[i], hyperplanes_i, local_f_x = generate_cuts(
                     oracle.typical_oracles[i],
                     clamp.(state.values[:ω_x][i] ./ state.values[:ω_0][i], 0.0, 1.0),
                     t_prime;
                     tol_normalize = state.values[:ω_0][i],
                     time_limit = get_sec_remaining(log.start_time, time_limit),
                 )
+                state.f_x[i] = copy(t_prime)
+                state.f_x[i][oracle.active_t_indices] = local_f_x
 
                 if !state.is_in_L[i]
                     for k in 1:2

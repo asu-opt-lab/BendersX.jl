@@ -3,6 +3,7 @@ using BendersX
 using JuMP
 using HiGHS
 using MathOptInterface
+using SparseArrays
 
 const SO_MOI = MathOptInterface
 
@@ -44,14 +45,36 @@ function update_separable_oracle_sub!(
     return nothing
 end
 
-function separable_oracle_fixture()
-    data = SeparableOracleTestData(2, [1.0 3.0; 3.0 1.0])
+function separable_oracle_fixture(n_scenarios::Int = 2)
+    costs = zeros(2, n_scenarios)
+    for j in 1:n_scenarios
+        costs[:, j] = isodd(j) ? [1.0, 3.0] : [3.0, 1.0]
+    end
+    data = SeparableOracleTestData(n_scenarios, costs)
     master = Master(
         data;
         model = update_separable_oracle_master!,
         optimizer = separable_oracle_optimizer(),
     )
     return data, master
+end
+
+function classical_separable_component(data, master, indices::Vector{Int})
+    children = [
+        ClassicalOracle(
+            data,
+            master;
+            model = update_separable_oracle_sub!,
+            scen_idx = index,
+            optimizer = separable_oracle_optimizer(),
+        ) for index in indices
+    ]
+    return SeparableOracle(
+        master,
+        children;
+        indices = indices,
+        auxiliary_ranges = [index:index for index in indices],
+    )
 end
 
 function separable_split_param(; reuse_dcglp::Bool = true)
@@ -76,6 +99,26 @@ end
 mutable struct StoredLocalDisjunctiveOracle <: BendersX.AbstractDisjunctiveOracle
     cut::BendersX.Hyperplane
     objective::Float64
+end
+
+mutable struct StoredLocalTypicalOracle <: BendersX.AbstractTypicalOracle
+    dimension::Int
+    cut::BendersX.Hyperplane
+    objectives::Vector{Float64}
+    received_t::Vector{Vector{Float64}}
+end
+
+BendersX.auxiliary_dimension(oracle::StoredLocalTypicalOracle) = oracle.dimension
+
+function BendersX.generate_cuts(
+    oracle::StoredLocalTypicalOracle,
+    ::Vector{Float64},
+    t_value::Vector{Float64};
+    tol_normalize = 1.0,
+    time_limit = 3600.0,
+)
+    push!(oracle.received_t, copy(t_value))
+    return false, [deepcopy(oracle.cut)], copy(oracle.objectives)
 end
 
 BendersX.auxiliary_dimension(::StoredLocalDisjunctiveOracle) = 1
@@ -147,18 +190,23 @@ end
 
 function local_split_oracle(data, master, scen_idx::Int; reuse_dcglp::Bool = true)
     typical_pair = ntuple(2) do _
-        ClassicalOracle(
-            data,
-            master;
-            model = update_separable_oracle_sub!,
-            scen_idx = scen_idx,
-            optimizer = separable_oracle_optimizer(),
-        )
+        classical_separable_component(data, master, [scen_idx])
     end
     return SplitOracle(
         master,
         typical_pair;
         param = separable_split_param(; reuse_dcglp = reuse_dcglp),
+    )
+end
+
+function grouped_split_oracle(data, master, indices::Vector{Int})
+    typical_pair = ntuple(2) do _
+        classical_separable_component(data, master, indices)
+    end
+    return SplitOracle(
+        master,
+        typical_pair;
+        param = separable_split_param(; reuse_dcglp = false),
     )
 end
 
@@ -173,6 +221,7 @@ end
         ]
         oracle = SeparableOracle(master, children)
 
+        @test oracle.indices == [[1], [2]]
         is_in_L, cuts, objectives = BendersX.generate_cuts(
             oracle,
             [0.5, 0.5],
@@ -203,6 +252,7 @@ end
             optimizer = nothing,
         )
         @test getfield.(oracle.oracles, :scen_idx) == [1, 2]
+        @test oracle.indices == [[1], [2]]
         _, cuts, objectives = BendersX.generate_cuts(oracle, [0.0, 0.0], [0.0, 0.0])
         @test objectives == [1.0, 2.0]
         @test collect(cuts[1].a_t) == [-1.0, 0.0]
@@ -228,6 +278,7 @@ end
         )
 
         @test oracle.dim_auxiliary == 4
+        @test oracle.indices == [[1], [2]]
         @test oracle.auxiliary_ranges == [1:2, 3:4]
         @test BendersX.auxiliary_dimension(oracle) == 4
 
@@ -245,6 +296,113 @@ end
             [0.0, 0.0, -1.0, 0.0],
             [0.0, 0.0, 0.0, -1.0],
         ]
+    end
+
+    @testset "extracts and embeds selected global auxiliary blocks" begin
+        _, master = separable_oracle_fixture(10)
+        selected_indices = [2, 3, 10]
+        children = [
+            StoredLocalTypicalOracle(
+                1,
+                BendersX.Hyperplane(
+                    [1.0, 0.0],
+                    [-Float64(index)],
+                    4.0,
+                ),
+                [100.0 + index],
+                Vector{Float64}[],
+            ) for index in selected_indices
+        ]
+        oracle = SeparableOracle(
+            master,
+            children;
+            indices = selected_indices,
+            auxiliary_ranges = [2:2, 3:3, 10:10],
+        )
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            oracle,
+            [0.5, 0.5],
+            collect(1.0:10.0),
+        )
+        @test !is_in_L
+        @test getfield.(children, :received_t) == [[[2.0]], [[3.0]], [[10.0]]]
+        @test objectives == [102.0, 103.0, 110.0]
+        @test findnz.(getfield.(cuts, :a_t)) == [
+            ([2], [-2.0]),
+            ([3], [-3.0]),
+            ([10], [-10.0]),
+        ]
+        @test oracle.indices == [[2], [3], [10]]
+        @test oracle.dim_auxiliary == 3
+        @test oracle.dim_global_auxiliary == 10
+    end
+
+    @testset "groups indices by component for nested composition" begin
+        data, master = separable_oracle_fixture(4)
+        first_group = classical_separable_component(data, master, [1, 2])
+        second_group = classical_separable_component(data, master, [3, 4])
+        oracle = SeparableOracle(
+            master,
+            [first_group, second_group];
+            indices = [[1, 2], [3, 4]],
+            auxiliary_ranges = [1:2, 3:4],
+        )
+
+        @test oracle.indices == [[1, 2], [3, 4]]
+        @test oracle.auxiliary_ranges == [1:2, 3:4]
+        @test oracle.dim_auxiliary == 4
+        @test oracle.dim_global_auxiliary == 4
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            oracle,
+            [1.0, 0.0],
+            zeros(4),
+        )
+        @test !is_in_L
+        @test objectives == [1.0, 3.0, 1.0, 3.0]
+        @test all(length(cut.a_t) == 4 for cut in cuts)
+        @test findnz.(getfield.(cuts, :a_t)) == [
+            ([1], [-1.0]),
+            ([2], [-1.0]),
+            ([3], [-1.0]),
+            ([4], [-1.0]),
+        ]
+    end
+
+    @testset "validates grouped SeparableOracle mappings" begin
+        _, master = separable_oracle_fixture(4)
+        two_dimensional = AuxiliaryDimensionTestOracle(2)
+
+        @test_throws DimensionMismatch SeparableOracle(
+            master,
+            [two_dimensional, two_dimensional];
+            indices = [[1, 2]],
+            auxiliary_ranges = [1:2, 3:4],
+        )
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [two_dimensional, two_dimensional];
+            indices = [[1, 2], [2, 3]],
+            auxiliary_ranges = [1:2, 3:4],
+        )
+        @test_throws DimensionMismatch SeparableOracle(
+            master,
+            [two_dimensional, two_dimensional];
+            indices = [[1, 2], [3, 4]],
+            auxiliary_ranges = [1:1, 2:4],
+        )
+        @test_throws DimensionMismatch SeparableOracle(
+            master,
+            [two_dimensional];
+            indices = [[1, 2]],
+        )
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [two_dimensional, two_dimensional];
+            indices = [[1, 2], [3, 4]],
+            auxiliary_ranges = [1:2, 2:3],
+        )
     end
 
     @testset "validates child and global output dimensions" begin
@@ -286,11 +444,13 @@ end
         )
     end
 
-    @testset "local SplitOracles reuse one-dimensional cut history" begin
+    @testset "subset SplitOracles reuse global cut history" begin
         data, master = separable_oracle_fixture()
         split_children = [local_split_oracle(data, master, j) for j in 1:2]
         oracle = SeparableOracle(master, split_children)
 
+        @test getfield.(split_children, :active_t_indices) == [[1], [2]]
+        @test length.(getindex.(getfield.(split_children, :dcglp), Ref(:st))) == [2, 2]
         for _ in 1:2
             is_in_L, cuts, objectives = BendersX.generate_cuts(
                 oracle,
@@ -302,21 +462,174 @@ end
             @test all(length(cut.a_t) == 2 for cut in cuts)
             @test length(objectives) == 2
             @test all(
-                length(cut.a_t) == 1
+                length(cut.a_t) == 2
                 for child in split_children for cut in child.disjunctive_cuts
             )
+            @test all(iszero(cut.a_t[2]) for cut in split_children[1].disjunctive_cuts)
+            @test all(iszero(cut.a_t[1]) for cut in split_children[2].disjunctive_cuts)
         end
     end
 
-    @testset "reverse-polar normalization uses the local t dimension" begin
+    @testset "SplitOracle keeps selected blocks in the global auxiliary space" begin
+        data, master = separable_oracle_fixture(4)
+        split = grouped_split_oracle(data, master, [2, 4])
+
+        @test split.dim_auxiliary == 2
+        @test split.active_t_indices == [2, 4]
+        @test length(split.dcglp[:st]) == 4
+        @test_throws DimensionMismatch BendersX.generate_cuts(
+            split,
+            [0.5, 0.5],
+            zeros(2),
+        )
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            split,
+            [0.5, 0.5],
+            zeros(4);
+            time_limit = 20.0,
+        )
+        @test is_in_L isa Bool
+        @test length(objectives) == 2
+        @test all(length(cut.a_t) == 4 for cut in cuts)
+        @test all(
+            iszero(cut.a_t[1]) && iszero(cut.a_t[3]) for cut in cuts
+        )
+        @test all(length(cut.a_t) == 4 for cut in split.disjunctive_cuts)
+        @test all(
+            iszero(cut.a_t[1]) && iszero(cut.a_t[3])
+            for cut in split.disjunctive_cuts
+        )
+    end
+
+    @testset "SplitOracle validates component mappings" begin
+        _, master = separable_oracle_fixture(4)
+        left = SeparableOracle(
+            master,
+            [AuxiliaryDimensionTestOracle(1)];
+            indices = [2],
+            auxiliary_ranges = [2:2],
+        )
+        different_index = SeparableOracle(
+            master,
+            [AuxiliaryDimensionTestOracle(1)];
+            indices = [3],
+            auxiliary_ranges = [2:2],
+        )
+        different_range = SeparableOracle(
+            master,
+            [AuxiliaryDimensionTestOracle(1)];
+            indices = [2],
+            auxiliary_ranges = [3:3],
+        )
+
+        index_error = try
+            SplitOracle(master, (left, different_index))
+            nothing
+        catch err
+            err
+        end
+        @test index_error isa ArgumentError
+        @test occursin("same indices", sprint(showerror, index_error))
+
+        range_error = try
+            SplitOracle(master, (left, different_range))
+            nothing
+        catch err
+            err
+        end
+        @test range_error isa DimensionMismatch
+        @test occursin("same auxiliary_ranges", sprint(showerror, range_error))
+
+        _, other_master = separable_oracle_fixture(5)
+        different_global_dimension = SeparableOracle(
+            other_master,
+            [AuxiliaryDimensionTestOracle(1)];
+            indices = [2],
+            auxiliary_ranges = [2:2],
+        )
+        global_dimension_error = try
+            SplitOracle(master, (left, different_global_dimension))
+            nothing
+        catch err
+            err
+        end
+        @test global_dimension_error isa DimensionMismatch
+        @test occursin(
+            "global auxiliary dimension",
+            sprint(showerror, global_dimension_error),
+        )
+
+        mixed_error = try
+            SplitOracle(master, (left, AuxiliaryDimensionTestOracle(1)))
+            nothing
+        catch err
+            err
+        end
+        @test mixed_error isa ArgumentError
+        @test occursin("both be SeparableOracles", sprint(showerror, mixed_error))
+
+        dimension_error = try
+            SplitOracle(
+                master,
+                (AuxiliaryDimensionTestOracle(2), AuxiliaryDimensionTestOracle(2)),
+            )
+            nothing
+        catch err
+            err
+        end
+        @test dimension_error isa DimensionMismatch
+        @test occursin("master.dim_t", sprint(showerror, dimension_error))
+    end
+
+    @testset "nested SeparableOracle combines SplitOracle groups" begin
+        data, master = separable_oracle_fixture(4)
+        first_split = grouped_split_oracle(data, master, [1, 2])
+        second_split = grouped_split_oracle(data, master, [3, 4])
+        oracle = SeparableOracle(
+            master,
+            [first_split, second_split];
+            indices = [[1, 2], [3, 4]],
+            auxiliary_ranges = [1:2, 3:4],
+        )
+
+        @test oracle.indices == [[1, 2], [3, 4]]
+        @test vcat(first_split.active_t_indices, second_split.active_t_indices) == 1:4
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            oracle,
+            [0.5, 0.5],
+            zeros(4);
+            time_limit = 20.0,
+        )
+        @test is_in_L isa Bool
+        @test length(objectives) == 4
+        @test all(length(cut.a_t) == 4 for cut in cuts)
+
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [first_split, grouped_split_oracle(data, master, [2, 4])];
+            indices = [[1, 2], [2, 4]],
+            auxiliary_ranges = [1:2, 2:3],
+        )
+    end
+
+    @testset "reverse-polar normalization uses the global t dimension" begin
         data, master = separable_oracle_fixture()
         typical_pair = ntuple(2) do _
-            ClassicalOracle(
-                data,
-                master;
-                model = update_separable_oracle_sub!,
-                scen_idx = 1,
-                optimizer = separable_oracle_optimizer(),
+            SeparableOracle(
+                master,
+                [
+                    ClassicalOracle(
+                        data,
+                        master;
+                        model = update_separable_oracle_sub!,
+                        scen_idx = 1,
+                        optimizer = separable_oracle_optimizer(),
+                    ),
+                ];
+                indices = [1],
+                auxiliary_ranges = [1:1],
             )
         end
         normalization = ReversePolarNormalization()
@@ -331,16 +644,17 @@ end
 
         @test split.dim_auxiliary == 1
         @test BendersX.auxiliary_dimension(split) == 1
-        @test length(split.dcglp[:st]) == 1
+        @test length(split.dcglp[:st]) == master.dim_t
+        @test split.active_t_indices == [1]
         @test normalization.core_direction_x == zeros(master.dim_x)
-        @test normalization.core_direction_t == ones(1)
+        @test normalization.core_direction_t == ones(master.dim_t)
 
         @test_throws DimensionMismatch SplitOracle(
             master,
             typical_pair;
             normalization = ReversePolarNormalization(;
                 core_direction_x = zeros(master.dim_x),
-                core_direction_t = ones(master.dim_t),
+                core_direction_t = ones(1),
             ),
             param = SplitOracleParam(;
                 dcglp_param = separable_split_param().dcglp_param,
@@ -415,6 +729,10 @@ end
 
         @test SplitOracle(master, (typical, typical)) isa SplitOracle
         @test_throws ArgumentError SplitOracle(master, (mixed, typical))
+        @test_throws DimensionMismatch SplitOracle(
+            master,
+            (AuxiliaryDimensionTestOracle(1), AuxiliaryDimensionTestOracle(1)),
+        )
         @test_throws DimensionMismatch SplitOracle(
             master,
             (AuxiliaryDimensionTestOracle(1), AuxiliaryDimensionTestOracle(2)),

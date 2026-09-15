@@ -51,26 +51,26 @@ function build_local_split_oracle(
     oracle_param::BendersX.AbstractOracleParam,
     split_param::SplitOracleParam,
 ) where {T<:BendersX.AbstractTypicalOracle}
-    kappa = oracle_type(
-        data,
-        master;
-        model = model,
-        scen_idx = scenario,
-        param = deepcopy(oracle_param),
-        optimizer = optimizer,
-    )
-    nu = oracle_type(
-        data,
-        master;
-        model = model,
-        scen_idx = scenario,
-        param = deepcopy(oracle_param),
-        optimizer = optimizer,
-    )
+    typical_pair = ntuple(2) do _
+        child = oracle_type(
+            data,
+            master;
+            model = model,
+            scen_idx = scenario,
+            param = deepcopy(oracle_param),
+            optimizer = optimizer,
+        )
+        SeparableOracle(
+            master,
+            [child];
+            indices = [scenario],
+            auxiliary_ranges = [scenario:scenario],
+        )
+    end
 
     return SplitOracle(
         master,
-        (kappa, nu);
+        typical_pair;
         normalization = LpDistanceNormalization(1.0),
         param = deepcopy(split_param),
     )
@@ -181,8 +181,8 @@ end
                         optimizer = mip_optimizer,
                     )
 
-                    # New composition: each scenario has its own one-dimensional
-                    # SplitOracle/DCGLP; SeparableOracle embeds local cuts at t[j].
+                    # Each SplitOracle receives two matching SeparableOracle
+                    # components and keeps its DCGLP in the global t space.
                     split_oracles = [
                         build_local_split_oracle(
                             data,

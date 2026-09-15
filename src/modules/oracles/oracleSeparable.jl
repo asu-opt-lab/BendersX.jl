@@ -83,9 +83,10 @@ Sub-oracles may have different concrete types, parameter objects, and auxiliary-
 # Fields
 param::SeparableOracleParam: Parameters controlling separable evaluation.
 oracles::Vector{AbstractOracle}: Configured oracles for the represented subproblems.
-indices::Vector{Int}: Global subproblem indices represented by the local oracles.
-auxiliary_ranges::Vector{UnitRange{Int}}: Global auxiliary-variable block of each
-local sub-oracle.
+indices::Vector{Vector{Int}}: Global subproblem indices represented by each
+component oracle.
+auxiliary_ranges::Vector{UnitRange{Int}}: Global auxiliary-variable block of
+each local sub-oracle.
 dim_auxiliary::Int: Total auxiliary-variable dimension represented by the contained sub-oracles.
 dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the master.
 
@@ -99,11 +100,11 @@ dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the m
         param = SeparableOracleParam(),
     )
 
-Construct a `SeparableOracle` from already configured sub-oracles. When
-`auxiliary_ranges` is omitted, the supplied oracles must represent the full
-auxiliary space and their ranges are inferred consecutively. For a partitioned
-oracle, pass the global `indices` and the corresponding global
-`auxiliary_ranges`.
+Construct a `SeparableOracle` from already configured component oracles. Each
+entry of `indices` lists the subproblems represented by the corresponding
+component. A vector of integers remains shorthand for one subproblem per
+component. When `auxiliary_ranges` is omitted, the supplied oracles must
+represent the full auxiliary space and their ranges are inferred consecutively.
 
     SeparableOracle(
         data,
@@ -141,7 +142,7 @@ mutable struct SeparableOracle <: AbstractOracle
     param::SeparableOracleParam 
 
     oracles::Vector{AbstractOracle}
-    indices::Vector{Int}
+    indices::Vector{Vector{Int}}
     auxiliary_ranges::Vector{UnitRange{Int}}
     dim_auxiliary::Int
     dim_global_auxiliary::Int
@@ -149,22 +150,38 @@ mutable struct SeparableOracle <: AbstractOracle
     function SeparableOracle(
         master::AbstractMaster,
         oracles::AbstractVector{<:AbstractOracle};
-        indices::AbstractVector{<:Integer} = collect(1:length(oracles)),
+        indices = collect(1:length(oracles)),
         auxiliary_ranges = nothing,
         param::SeparableOracleParam = SeparableOracleParam(),
     )
-        indices = Int.(indices)
         n_local = length(oracles)
 
+        # Grouping preserves which subproblems belong to each component while
+        # retaining the original flat-vector constructor as shorthand.
+        if all(index -> index isa Integer, indices)
+            index_groups = [[Int(index)] for index in indices]
+        elseif all(group -> group isa AbstractVector &&
+                    all(index -> index isa Integer, group), indices)
+            index_groups = [Int.(group) for group in indices]
+        else
+            throw(ArgumentError(
+                "SeparableOracle: indices must contain integers or vectors of integers.",
+            ))
+        end
+
         # check the validity of the supplied indices
-        length(indices) == n_local || throw(DimensionMismatch(
-            "SeparableOracle: number of indices ($(length(indices))) must equal " *
-            "number of sub-oracles ($n_local).",
+        length(index_groups) == n_local || throw(DimensionMismatch(
+            "SeparableOracle: number of index groups ($(length(index_groups))) must " *
+            "equal number of component oracles ($n_local).",
         ))
-        length(unique(indices)) == length(indices) || throw(ArgumentError(
+        all(group -> !isempty(group), index_groups) || throw(ArgumentError(
+            "SeparableOracle: every component must represent at least one subproblem.",
+        ))
+        flat_indices = reduce(vcat, index_groups; init = Int[])
+        length(unique(flat_indices)) == length(flat_indices) || throw(ArgumentError(
             "SeparableOracle: subproblem indices must be unique.",
         ))
-        all(>(0), indices) || throw(ArgumentError(
+        all(>(0), flat_indices) || throw(ArgumentError(
             "SeparableOracle: subproblem indices must be positive.",
         ))
 
@@ -190,14 +207,15 @@ mutable struct SeparableOracle <: AbstractOracle
         else
             length(auxiliary_ranges) == n_local || throw(DimensionMismatch(
                 "SeparableOracle: number of auxiliary ranges " *
-                "($(length(auxiliary_ranges))) must equal number of sub-oracles ($n_local).",
+                "($(length(auxiliary_ranges))) must equal number of component " *
+                "oracles ($n_local).",
             ))
             ranges = UnitRange{Int}[first(r):last(r) for r in auxiliary_ranges]
             for k in eachindex(ranges)
                 length(ranges[k]) == child_dimensions[k] || throw(DimensionMismatch(
-                    "SeparableOracle: subproblem $(indices[k]) has auxiliary dimension " *
-                    "$(child_dimensions[k]), but its global auxiliary range $(ranges[k]) " *
-                    "has length $(length(ranges[k])).",
+                    "SeparableOracle: component $(index_groups[k]) has auxiliary " *
+                    "dimension $(child_dimensions[k]), but its global auxiliary " *
+                    "range $(ranges[k]) has length $(length(ranges[k])).",
                 ))
                 first(ranges[k]) >= 1 && last(ranges[k]) <= master.dim_t || throw(ArgumentError(
                     "SeparableOracle: auxiliary range $(ranges[k]) lies outside " *
@@ -210,7 +228,7 @@ mutable struct SeparableOracle <: AbstractOracle
             ))
         end
 
-        @info "SeparableOracle: $(n_local) assigned subproblems, " *
+        @info "SeparableOracle: $(length(flat_indices)) assigned subproblems, " *
               "dim_auxiliary=$(dim_auxiliary), " *
               "dim_global_auxiliary=$(master.dim_t), " *
               "$(Threads.nthreads()) threads available for parallel execution"
@@ -218,7 +236,7 @@ mutable struct SeparableOracle <: AbstractOracle
         new(
             param,
             AbstractOracle[oracles...],
-            indices,
+            index_groups,
             ranges,
             dim_auxiliary,
             master.dim_t,
@@ -275,21 +293,21 @@ auxiliary_dimension(oracle::SeparableOracle) = oracle.dim_auxiliary
 
 function embed_local_cut(
     h::Hyperplane,
-    child_index::Int,
+    child_indices::Vector{Int},
     auxiliary_range::UnitRange{Int},
     dim_global_auxiliary::Int,
     dim_x::Int,
 )
     length(h.a_x) == dim_x || throw(
         DimensionMismatch(
-            "SeparableOracle child $child_index returned a cut with " *
+            "SeparableOracle child $child_indices returned a cut with " *
             "a_x length $(length(h.a_x)); expected $dim_x.",
         ),
     )
     child_dimension = length(auxiliary_range)
     length(h.a_t) == child_dimension || throw(
         DimensionMismatch(
-            "SeparableOracle child $child_index returned a cut with " *
+            "SeparableOracle child $child_indices returned a cut with " *
             "a_t length $(length(h.a_t)); expected $child_dimension.",
         ),
     )
@@ -317,12 +335,11 @@ end
 Generate Benders cuts by evaluating the sub-oracles represented by this
 `SeparableOracle` in parallel.
 
-Each local sub-oracle is evaluated at the common candidate `x_value` and its
-corresponding local block of the global `t_value`. Generated cuts are embedded
-in the full global auxiliary space. The returned `sub_obj_vals` concatenate the local
-subproblem objective values in the order of `oracle.indices`; the caller can
-use `oracle.auxiliary_ranges` (or an externally known partition mapping) to
-place them in a global vector.
+Each component oracle is evaluated at the common candidate `x_value`. Leaf
+oracles receive their corresponding block of `t_value`, while nested
+`SeparableOracle`s and `SplitOracle`s receive the full vector because they own
+their local-to-global mappings. The returned `sub_obj_vals` follow the order of
+the flattened `oracle.indices`.
 
 Returns `(is_in_L, hyperplanes, sub_obj_vals)`, where `is_in_L` indicates whether the candidate is reported as belonging to the feasible regions of all sub-oracles.
 """
@@ -343,35 +360,45 @@ function generate_cuts(oracle::SeparableOracle, x_value::Vector{Float64}, t_valu
 
     try
         Threads.@threads for k=1:n_local
-            global_index = oracle.indices[k]
+            child = oracle.oracles[k]
+            represented_indices = oracle.indices[k]
             auxiliary_range = oracle.auxiliary_ranges[k]
             child_dimension = length(auxiliary_range)
 
+            # Composite children own a local-to-global mapping, so they receive
+            # the global candidate and already return globally embedded cuts.
+            child_uses_global_space = child isa SeparableOracle || child isa SplitOracle
+            child_t_value = child_uses_global_space ? t_value : t_value[auxiliary_range]
+
             child_is_in_L, child_hyperplanes, child_obj_vals = generate_cuts(
-                oracle.oracles[k],
+                child,
                 x_value,
-                t_value[auxiliary_range];
+                child_t_value;
                 tol_normalize = tol_normalize,
                 time_limit = get_sec_remaining(tic, time_limit),
             )
             length(child_obj_vals) == child_dimension || throw(
                 DimensionMismatch(
-                    "SeparableOracle subproblem $global_index returned " *
+                    "SeparableOracle component for subproblems $represented_indices returned " *
                     "$(length(child_obj_vals)) objective values; expected $child_dimension.",
                 ),
             )
 
             local_is_in_L[k] = child_is_in_L
             sub_obj_vals[k] = child_obj_vals
-            hyperplanes[k] = [
-                embed_local_cut(
-                    h,
-                    global_index,
-                    auxiliary_range,
-                    dim_global_auxiliary,
-                    length(x_value),
-                ) for h in child_hyperplanes
-            ]
+            if child_uses_global_space
+                hyperplanes[k] = child_hyperplanes
+            else
+                hyperplanes[k] = [
+                    embed_local_cut(
+                        h,
+                        represented_indices,
+                        auxiliary_range,
+                        dim_global_auxiliary,
+                        length(x_value),
+                    ) for h in child_hyperplanes
+                ]
+            end
         end
     catch err
         err isa CompositeException || rethrow()

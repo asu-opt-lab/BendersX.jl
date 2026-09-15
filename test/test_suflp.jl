@@ -177,21 +177,31 @@ end
         ]
 
         split_children = [
-            SplitOracle(
-                master,
-                (
-                    UFLKnapsackOracle(data; scen_idx = scenario),
-                    UFLKnapsackOracle(data; scen_idx = scenario),
-                );
-                normalization = LpDistanceNormalization(1.0),
-                param = suflp_test_split_param(),
-            ) for scenario in 1:data.n_scenarios
+            begin
+                block_start = (scenario - 1) * data.n_customers + 1
+                block = block_start:(block_start + data.n_customers - 1)
+                typical_pair = ntuple(2) do _
+                    SeparableOracle(
+                        master,
+                        [UFLKnapsackOracle(data; scen_idx = scenario)];
+                        indices = [scenario],
+                        auxiliary_ranges = [block],
+                    )
+                end
+                SplitOracle(
+                    master,
+                    typical_pair;
+                    normalization = LpDistanceNormalization(1.0),
+                    param = suflp_test_split_param(),
+                )
+            end for scenario in 1:data.n_scenarios
         ]
         split_oracle = SeparableOracle(master, split_children)
         @test split_oracle.dim_auxiliary == 4
         @test split_oracle.auxiliary_ranges == [1:2, 3:4]
         @test BendersX.auxiliary_dimension.(split_children) == [2, 2]
-        @test all(length(child.dcglp[:st]) == 2 for child in split_children)
+        @test all(length(child.dcglp[:st]) == master.dim_t for child in split_children)
+        @test getfield.(split_children, :active_t_indices) == [[1, 2], [3, 4]]
     end
 
     @testset "Benders formulations match the extensive form" begin

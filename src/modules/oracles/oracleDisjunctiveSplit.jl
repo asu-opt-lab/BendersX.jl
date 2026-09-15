@@ -103,7 +103,10 @@ Split-based disjunctive Benders oracle.
 - `normalization::AbstractNormalization`: Normalization scheme used for disjunctive cut generation. See [`AbstractNormalization`](@ref) for available options.
 - `dcglp::Model`: The relaxed DCGLP problem used to generate disjunctive cuts.
 - `typical_oracles::Tuple{<:AbstractOracle,<:AbstractOracle}`: Typical oracles associated with the two sides of the split.
-- `dim_auxiliary::Int`: Auxiliary-variable dimension inferred from the component oracles and used by this oracle's DCGLP.
+- `dim_auxiliary::Int`: Number of auxiliary variables represented by the
+  component oracles.
+- `active_t_indices::Vector{Int}`: Positions in the master's auxiliary vector
+  represented by the component oracles.
 - `disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}`: Previously generated disjunctive cuts grouped by split index.
 - `disjunctive_cuts::Vector{Hyperplane}`: Collection of generated disjunctive cuts.
 - `splits::Vector{Tuple{SparseVector{Float64,Int},Float64}}`: Split disjunctions generated during cut separation.
@@ -122,7 +125,11 @@ Split-based disjunctive Benders oracle.
 
 Construct a split oracle using two typical oracles, a normalization scheme,
 and the specified split-oracle configuration. The two component oracles must
-have the same auxiliary-variable dimension.
+have the same auxiliary-variable dimension. When both components are
+`SeparableOracle`s, they must describe the same subproblems and global
+auxiliary blocks. The DCGLP always uses the master's complete auxiliary space;
+coordinates outside those blocks remain inactive. Other component oracles
+must operate on the complete master auxiliary vector.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
 """
@@ -139,6 +146,7 @@ mutable struct SplitOracle{
     disjunctive_cuts::Vector{Hyperplane}
     splits::Vector{Tuple{SparseVector{Float64, Int}, Float64}}
     dim_auxiliary::Int
+    active_t_indices::Vector{Int}
 
     function SplitOracle(
         master::AbstractMaster,
@@ -162,11 +170,58 @@ mutable struct SplitOracle{
         )
         dim_auxiliary = first(dims)
 
+        # SeparableOracle components must agree on the selected part of the
+        # global auxiliary space represented by this SplitOracle.
+        separable_components = [oracle isa SeparableOracle for oracle in typical_oracles]
+        all(separable_components) || !any(separable_components) || throw(ArgumentError(
+            "SplitOracle: component oracles must either both be SeparableOracles " *
+            "or both operate on the complete auxiliary space.",
+        ))
+
+        if all(separable_components)
+            first_oracle, second_oracle = typical_oracles
+            first_oracle.indices == second_oracle.indices || throw(ArgumentError(
+                "SplitOracle: SeparableOracle components must have the same indices; " *
+                "got $(first_oracle.indices) and $(second_oracle.indices).",
+            ))
+            first_oracle.auxiliary_ranges == second_oracle.auxiliary_ranges || throw(
+                DimensionMismatch(
+                    "SplitOracle: SeparableOracle components must have the same " *
+                    "auxiliary_ranges; got $(first_oracle.auxiliary_ranges) and " *
+                    "$(second_oracle.auxiliary_ranges).",
+                ),
+            )
+            first_oracle.dim_global_auxiliary == second_oracle.dim_global_auxiliary || throw(
+                DimensionMismatch(
+                    "SplitOracle: SeparableOracle components must have the same global " *
+                    "auxiliary dimension; got $(first_oracle.dim_global_auxiliary) and " *
+                    "$(second_oracle.dim_global_auxiliary).",
+                ),
+            )
+            first_oracle.dim_global_auxiliary == master.dim_t || throw(DimensionMismatch(
+                "SplitOracle: component global auxiliary dimension " *
+                "$(first_oracle.dim_global_auxiliary) must equal master.dim_t " *
+                "($(master.dim_t)).",
+            ))
+            active_t_indices = reduce(
+                vcat,
+                collect.(first_oracle.auxiliary_ranges);
+                init = Int[],
+            )
+        else
+            dim_auxiliary == master.dim_t || throw(DimensionMismatch(
+                "SplitOracle: a component that is not a SeparableOracle must have " *
+                "auxiliary dimension master.dim_t ($(master.dim_t)); got " *
+                "$dim_auxiliary.",
+            ))
+            active_t_indices = collect(1:master.dim_t)
+        end
+
         dcglp = build_dcglp(
             master,
             normalization,
             param;
-            dim_t = dim_auxiliary,
+            dim_t = master.dim_t,
         )
         
         disjunctive_cuts_by_index = [
@@ -184,6 +239,7 @@ mutable struct SplitOracle{
             disjunctive_cuts,
             splits,
             dim_auxiliary,
+            active_t_indices,
         )
     end
 end
@@ -224,11 +280,12 @@ function generate_cuts(
 )
     tic = time()
 
-    dim_auxiliary = auxiliary_dimension(oracle)
-    length(t_value) == dim_auxiliary || throw(
+    dim_global_auxiliary = length(oracle.dcglp[:st])
+    length(t_value) == dim_global_auxiliary || throw(
         DimensionMismatch(
             "SplitOracle received t_value with length $(length(t_value)); " *
-            "expected $dim_auxiliary.",
+            "expected the master auxiliary dimension " *
+            "$dim_global_auxiliary.",
         ),
     )
 

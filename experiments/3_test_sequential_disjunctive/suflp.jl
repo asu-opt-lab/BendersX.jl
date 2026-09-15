@@ -15,20 +15,25 @@ function build_local_split_oracle(
     oracle_param::BendersX.AbstractOracleParam,
     split_param::SplitOracleParam,
 )
-    kappa = UFLKnapsackOracle(
-        data;
-        scen_idx = scenario,
-        param = deepcopy(oracle_param),
-    )
-    nu = UFLKnapsackOracle(
-        data;
-        scen_idx = scenario,
-        param = deepcopy(oracle_param),
-    )
+    block_start = (scenario - 1) * data.n_customers + 1
+    block = block_start:(block_start + data.n_customers - 1)
+    typical_pair = ntuple(2) do _
+        child = UFLKnapsackOracle(
+            data;
+            scen_idx = scenario,
+            param = deepcopy(oracle_param),
+        )
+        SeparableOracle(
+            master,
+            [child];
+            indices = [scenario],
+            auxiliary_ranges = [block],
+        )
+    end
 
     return SplitOracle(
         master,
-        (kappa, nu);
+        typical_pair;
         normalization = LpDistanceNormalization(1.0),
         param = deepcopy(split_param),
     )

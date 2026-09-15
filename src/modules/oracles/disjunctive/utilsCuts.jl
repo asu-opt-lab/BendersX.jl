@@ -151,9 +151,13 @@ function build_dcglp_disjunctive_cut(
     common::SplitOracleParam,
     zero_indices::Vector{Int},
     one_indices::Vector{Int},
+    active_t_indices::Vector{Int},
 )
     gamma_x = dual.(dcglp[:conx])
     gamma_t = dual.(dcglp[:cont])
+    # Component-oracle cuts do not restrict these coordinates. Exclude them
+    # from the returned disjunctive cut before computing its normalization.
+    gamma_t[setdiff(eachindex(gamma_t), active_t_indices)] .= 0.0
     gamma_0 = dual(dcglp[:con0])
 
     gamma_x, gamma_0 = apply_lift_or_strengthen(
