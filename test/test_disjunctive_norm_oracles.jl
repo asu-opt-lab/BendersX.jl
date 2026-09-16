@@ -17,6 +17,8 @@ struct DirectionalVectorTTestOracle <: BendersX.AbstractTypicalOracle end
 
 struct DcglpInterruptionTestOracle <: BendersX.AbstractTypicalOracle end
 
+BendersX.auxiliary_dimension(::DirectionalVectorTTestOracle) = 2
+
 struct ExtensionContractNormalization <: BendersX.AbstractNormalization end
 struct MissingContractNormalization <: BendersX.AbstractNormalization end
 
