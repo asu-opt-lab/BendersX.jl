@@ -500,6 +500,12 @@ end
             iszero(cut.a_t[1]) && iszero(cut.a_t[3])
             for cut in split.disjunctive_cuts
         )
+
+        raw_gamma_t = dual.(split.dcglp[:cont])
+        @test all(
+            isapprox(raw_gamma_t[index], 0.0; atol = split.param.zero_tol)
+            for index in (1, 3)
+        )
     end
 
     @testset "SplitOracle validates component mappings" begin

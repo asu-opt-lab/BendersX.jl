@@ -155,9 +155,12 @@ function build_dcglp_disjunctive_cut(
 )
     gamma_x = dual.(dcglp[:conx])
     gamma_t = dual.(dcglp[:cont])
-    # Component-oracle cuts do not restrict these coordinates. Exclude them
-    # from the returned disjunctive cut before computing its normalization.
-    gamma_t[setdiff(eachindex(gamma_t), active_t_indices)] .= 0.0
+    inactive_t_indices = setdiff(eachindex(gamma_t), active_t_indices)
+    if any(abs(gamma_t[index]) > common.zero_tol for index in inactive_t_indices)
+        @warn "SplitOracle: nonzero inactive gamma_t coefficients detected; " *
+              "falling back to typical cuts." maxlog = 1
+        return nothing
+    end
     gamma_0 = dual(dcglp[:con0])
 
     gamma_x, gamma_0 = apply_lift_or_strengthen(
