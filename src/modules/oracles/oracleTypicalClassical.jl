@@ -83,8 +83,6 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
 
             new(param, sub_model, fix_x, gbc_lhs, gbc_rhs, gbc_sense)
     end
-
-    ClassicalOracle() = new()
 end
 
 """

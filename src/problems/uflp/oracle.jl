@@ -64,8 +64,6 @@ mutable struct UFLKnapsackOracle <: AbstractTypicalOracle
 
             new(param, sorted_cost_demands, sorted_indices, J, obj_values)
     end
-
-    UFLKnapsackOracle() = new()
 end
 
 auxiliary_dimension(oracle::UFLKnapsackOracle) = oracle.J

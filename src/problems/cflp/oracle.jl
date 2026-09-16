@@ -67,8 +67,6 @@ mutable struct CFLKnapsackOracle <: AbstractTypicalOracle
 
         new(param, sub_model, fix_x, facility_knapsack_info, gbc_lhs, gbc_rhs, gbc_sense)
     end
-    
-    CFLKnapsackOracle() = new()
 end
 
 function generate_cuts(oracle::CFLKnapsackOracle, x_value::Vector{Float64}, t_value::Vector{Float64}; tol_normalize = 1.0, time_limit = 3600)

@@ -148,8 +148,6 @@ mutable struct UnifiedOracle <: AbstractTypicalOracle
         
         return oracle
     end
-
-    UnifiedOracle() = new()
 end
 
 """

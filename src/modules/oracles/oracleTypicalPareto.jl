@@ -179,9 +179,6 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
 
         new(param, sub_model, fix_x, pareto_model)
     end
-
-    ParetoOracle() = new()
-
     function ParetoOracle(data, master::Master;
                           model = update_sub_model!,
                           scen_idx::Int = 0,
