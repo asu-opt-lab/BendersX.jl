@@ -459,14 +459,12 @@ end
                 time_limit = 20.0,
             )
             @test is_in_L isa Bool
-            @test all(length(cut.a_t) == 2 for cut in cuts)
+            @test all(length(cut.a_t) == master.dim_t for cut in cuts)
             @test length(objectives) == 2
             @test all(
-                length(cut.a_t) == 2
+                length(cut.a_t) == master.dim_t
                 for child in split_children for cut in child.disjunctive_cuts
             )
-            @test all(iszero(cut.a_t[2]) for cut in split_children[1].disjunctive_cuts)
-            @test all(iszero(cut.a_t[1]) for cut in split_children[2].disjunctive_cuts)
         end
     end
 
@@ -491,20 +489,11 @@ end
         )
         @test is_in_L isa Bool
         @test length(objectives) == 2
-        @test all(length(cut.a_t) == 4 for cut in cuts)
         @test all(
-            iszero(cut.a_t[1]) && iszero(cut.a_t[3]) for cut in cuts
+            length(cut.a_t) == master.dim_t for cut in cuts
         )
-        @test all(length(cut.a_t) == 4 for cut in split.disjunctive_cuts)
         @test all(
-            iszero(cut.a_t[1]) && iszero(cut.a_t[3])
-            for cut in split.disjunctive_cuts
-        )
-
-        raw_gamma_t = dual.(split.dcglp[:cont])
-        @test all(
-            isapprox(raw_gamma_t[index], 0.0; atol = split.param.zero_tol)
-            for index in (1, 3)
+            length(cut.a_t) == master.dim_t for cut in split.disjunctive_cuts
         )
     end
 

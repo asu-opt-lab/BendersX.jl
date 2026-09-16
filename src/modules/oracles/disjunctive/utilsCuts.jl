@@ -151,16 +151,9 @@ function build_dcglp_disjunctive_cut(
     common::SplitOracleParam,
     zero_indices::Vector{Int},
     one_indices::Vector{Int},
-    active_t_indices::Vector{Int},
 )
     gamma_x = dual.(dcglp[:conx])
     gamma_t = dual.(dcglp[:cont])
-    inactive_t_indices = setdiff(eachindex(gamma_t), active_t_indices)
-    if any(abs(gamma_t[index]) > common.zero_tol for index in inactive_t_indices)
-        @warn "SplitOracle: nonzero inactive gamma_t coefficients detected; " *
-              "falling back to typical cuts." maxlog = 1
-        return nothing
-    end
     gamma_0 = dual(dcglp[:con0])
 
     gamma_x, gamma_0 = apply_lift_or_strengthen(

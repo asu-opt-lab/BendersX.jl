@@ -155,11 +155,11 @@ end
                         for child in oracle.oracles
                     )
                     @test all(
-                        length(child.dcglp[:st]) == data.n_customers
+                        length(child.dcglp[:st]) == master.dim_t
                         for child in oracle.oracles
                     )
                     @test all(
-                        length(cut.a_t) == data.n_customers
+                        length(cut.a_t) == master.dim_t
                         for child in oracle.oracles for cut in child.disjunctive_cuts
                     )
                 end

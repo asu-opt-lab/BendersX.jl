@@ -285,13 +285,6 @@ function solve_dcglp!(
                 oracle.param,
                 zero_indices,
                 one_indices,
-                oracle.active_t_indices,
-            )
-            cut === nothing && return generate_cuts(
-                oracle.typical_oracles[1],
-                x_value,
-                t_value;
-                time_limit = get_sec_remaining(log.start_time, time_limit),
             )
             oracle.param.dcglp_param.verbose && print_disjunctive_cut(oracle, cut, x_value, t_value; zero_tol = oracle.param.zero_tol)
             store_dcglp_disjunctive_cut!(oracle, cut, hyperplanes)

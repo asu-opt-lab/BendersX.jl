@@ -225,9 +225,12 @@ end
                     @test all(
                         child.dim_auxiliary == 1 for child in oracle.oracles
                     )
-                    @test all(length(child.dcglp[:st]) == 1 for child in oracle.oracles)
                     @test all(
-                        length(cut.a_t) == 1
+                        length(child.dcglp[:st]) == master.dim_t
+                        for child in oracle.oracles
+                    )
+                    @test all(
+                        length(cut.a_t) == master.dim_t
                         for child in oracle.oracles for cut in child.disjunctive_cuts
                     )
                 end
