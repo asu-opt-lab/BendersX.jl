@@ -110,7 +110,7 @@ split_oracles = [
                 master,
                 [ClassicalOracle(data, master; scen_idx = j)];
                 indices = [j],
-                auxiliary_ranges = [j:j],
+                auxiliary_indices = [[j]],
             )
         end
         SplitOracle(
@@ -127,8 +127,9 @@ oracle = SeparableOracle(master, split_oracles)
 
 Each component declares the number of represented `t` values through
 `auxiliary_dimension`. For leaf components, the wrapper extracts the assigned
-block of the global `t` and embeds each returned cut into the master auxiliary
-space. Contained `SeparableOracle`s and `SplitOracle`s already receive the
+coordinates of the global `t` and embeds each returned cut into the master
+auxiliary space. The ordered `auxiliary_indices` mapping need not be
+contiguous. Contained `SeparableOracle`s and `SplitOracle`s already receive the
 global `t` and return global cuts. Their grouped `indices`, such as
 `[[1, 2], [3, 4]]`, record which subproblems belong to each component.
 
@@ -219,8 +220,8 @@ These two composition orders have different meanings:
 
 - `SplitOracle(SeparableOracle(...), SeparableOracle(...))` always builds its
   DCGLP in the master's global auxiliary space. Matching component oracles
-  determine which `t[j]` coordinates are active; returned cuts have zero
-  coefficients outside those coordinates.
+  determine which `t[j]` coordinates their subproblems update. Returned cuts
+  retain the coefficients of every auxiliary variable in the global DCGLP.
 - `SeparableOracle` containing several `SplitOracle`s evaluates one global-space
   DCGLP per assigned group and directly combines the returned global cuts.
 
@@ -230,7 +231,7 @@ oracle uses dimension one by default and overrides `auxiliary_dimension` only
 when it represents a larger auxiliary space. `SeparableOracle` reports the sum
 of its component-oracle dimensions. The two components of a `SplitOracle` must
 report the same dimension and, when they are `SeparableOracle`s, must carry
-identical `indices` and `auxiliary_ranges`.
+identical `indices` and `auxiliary_indices`.
 
 ### Configuring `SplitOracle` Behavior
 

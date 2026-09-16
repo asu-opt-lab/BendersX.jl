@@ -73,7 +73,7 @@ function classical_separable_component(data, master, indices::Vector{Int})
         master,
         children;
         indices = indices,
-        auxiliary_ranges = [index:index for index in indices],
+        auxiliary_indices = [[index] for index in indices],
     )
 end
 
@@ -279,7 +279,7 @@ end
 
         @test oracle.dim_auxiliary == 4
         @test oracle.indices == [[1], [2]]
-        @test oracle.auxiliary_ranges == [1:2, 3:4]
+        @test oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test BendersX.auxiliary_dimension(oracle) == 4
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -298,7 +298,7 @@ end
         ]
     end
 
-    @testset "extracts and embeds selected global auxiliary blocks" begin
+    @testset "extracts and embeds selected global auxiliary coordinates" begin
         _, master = separable_oracle_fixture(10)
         selected_indices = [2, 3, 10]
         children = [
@@ -317,7 +317,7 @@ end
             master,
             children;
             indices = selected_indices,
-            auxiliary_ranges = [2:2, 3:3, 10:10],
+            auxiliary_indices = [[2], [3], [10]],
         )
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -338,6 +338,53 @@ end
         @test oracle.dim_global_auxiliary == 10
     end
 
+    @testset "supports noncontiguous auxiliary indices for one component" begin
+        _, master = separable_oracle_fixture(10)
+        child = StoredLocalTypicalOracle(
+            3,
+            BendersX.Hyperplane(
+                [1.0, 0.0],
+                [-8.0, -2.0, -5.0],
+                4.0,
+            ),
+            [108.0, 102.0, 105.0],
+            Vector{Float64}[],
+        )
+        oracle = SeparableOracle(
+            master,
+            [child];
+            indices = [[8, 2, 5]],
+            auxiliary_indices = [[8, 2, 5]],
+        )
+
+        is_in_L, cuts, objectives = BendersX.generate_cuts(
+            oracle,
+            [0.5, 0.5],
+            collect(1.0:10.0),
+        )
+
+        @test !is_in_L
+        @test child.received_t == [[8.0, 2.0, 5.0]]
+        @test objectives == [108.0, 102.0, 105.0]
+        @test findnz(cuts[1].a_t) == ([2, 5, 8], [-2.0, -5.0, -8.0])
+        @test oracle.auxiliary_indices == [[8, 2, 5]]
+
+        typical_pair = ntuple(2) do _
+            SeparableOracle(
+                master,
+                [AuxiliaryDimensionTestOracle(3)];
+                indices = [[8, 2, 5]],
+                auxiliary_indices = [[8, 2, 5]],
+            )
+        end
+        split = SplitOracle(
+            master,
+            typical_pair;
+            param = separable_split_param(),
+        )
+        @test split.active_t_indices == [8, 2, 5]
+    end
+
     @testset "groups indices by component for nested composition" begin
         data, master = separable_oracle_fixture(4)
         first_group = classical_separable_component(data, master, [1, 2])
@@ -346,11 +393,11 @@ end
             master,
             [first_group, second_group];
             indices = [[1, 2], [3, 4]],
-            auxiliary_ranges = [1:2, 3:4],
+            auxiliary_indices = [[1, 2], [3, 4]],
         )
 
         @test oracle.indices == [[1, 2], [3, 4]]
-        @test oracle.auxiliary_ranges == [1:2, 3:4]
+        @test oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test oracle.dim_auxiliary == 4
         @test oracle.dim_global_auxiliary == 4
 
@@ -378,19 +425,19 @@ end
             master,
             [two_dimensional, two_dimensional];
             indices = [[1, 2]],
-            auxiliary_ranges = [1:2, 3:4],
+            auxiliary_indices = [[1, 2], [3, 4]],
         )
         @test_throws ArgumentError SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
             indices = [[1, 2], [2, 3]],
-            auxiliary_ranges = [1:2, 3:4],
+            auxiliary_indices = [[1, 2], [3, 4]],
         )
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
             indices = [[1, 2], [3, 4]],
-            auxiliary_ranges = [1:1, 2:4],
+            auxiliary_indices = [[1], [2, 3, 4]],
         )
         @test_throws DimensionMismatch SeparableOracle(
             master,
@@ -401,7 +448,13 @@ end
             master,
             [two_dimensional, two_dimensional];
             indices = [[1, 2], [3, 4]],
-            auxiliary_ranges = [1:2, 2:3],
+            auxiliary_indices = [[1, 2], [2, 3]],
+        )
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [two_dimensional, two_dimensional];
+            indices = [[1, 2], [3, 4]],
+            auxiliary_indices = [[1, 2], [3, 5]],
         )
     end
 
@@ -503,19 +556,19 @@ end
             master,
             [AuxiliaryDimensionTestOracle(1)];
             indices = [2],
-            auxiliary_ranges = [2:2],
+            auxiliary_indices = [[2]],
         )
         different_index = SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(1)];
             indices = [3],
-            auxiliary_ranges = [2:2],
+            auxiliary_indices = [[2]],
         )
-        different_range = SeparableOracle(
+        different_mapping = SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(1)];
             indices = [2],
-            auxiliary_ranges = [3:3],
+            auxiliary_indices = [[3]],
         )
 
         index_error = try
@@ -527,21 +580,21 @@ end
         @test index_error isa ArgumentError
         @test occursin("same indices", sprint(showerror, index_error))
 
-        range_error = try
-            SplitOracle(master, (left, different_range))
+        mapping_error = try
+            SplitOracle(master, (left, different_mapping))
             nothing
         catch err
             err
         end
-        @test range_error isa DimensionMismatch
-        @test occursin("same auxiliary_ranges", sprint(showerror, range_error))
+        @test mapping_error isa DimensionMismatch
+        @test occursin("same auxiliary_indices", sprint(showerror, mapping_error))
 
         _, other_master = separable_oracle_fixture(5)
         different_global_dimension = SeparableOracle(
             other_master,
             [AuxiliaryDimensionTestOracle(1)];
             indices = [2],
-            auxiliary_ranges = [2:2],
+            auxiliary_indices = [[2]],
         )
         global_dimension_error = try
             SplitOracle(master, (left, different_global_dimension))
@@ -585,7 +638,7 @@ end
             master,
             [first_split, second_split];
             indices = [[1, 2], [3, 4]],
-            auxiliary_ranges = [1:2, 3:4],
+            auxiliary_indices = [[1, 2], [3, 4]],
         )
 
         @test oracle.indices == [[1, 2], [3, 4]]
@@ -605,7 +658,7 @@ end
             master,
             [first_split, grouped_split_oracle(data, master, [2, 4])];
             indices = [[1, 2], [2, 4]],
-            auxiliary_ranges = [1:2, 2:3],
+            auxiliary_indices = [[1, 2], [2, 3]],
         )
     end
 
@@ -624,7 +677,7 @@ end
                     ),
                 ];
                 indices = [1],
-                auxiliary_ranges = [1:1],
+                auxiliary_indices = [[1]],
             )
         end
         normalization = ReversePolarNormalization()

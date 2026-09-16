@@ -158,7 +158,7 @@ end
 
         @test master.dim_t == data.n_customers * data.n_scenarios
         @test master.c_t == [0.25, 0.25, 0.75, 0.75]
-        @test oracle.auxiliary_ranges == [1:2, 3:4]
+        @test oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test oracle.dim_auxiliary == 4
         @test BendersX.auxiliary_dimension.(oracle.oracles) == [2, 2]
 
@@ -185,7 +185,7 @@ end
                         master,
                         [UFLKnapsackOracle(data; scen_idx = scenario)];
                         indices = [scenario],
-                        auxiliary_ranges = [block],
+                        auxiliary_indices = [collect(block)],
                     )
                 end
                 SplitOracle(
@@ -198,7 +198,7 @@ end
         ]
         split_oracle = SeparableOracle(master, split_children)
         @test split_oracle.dim_auxiliary == 4
-        @test split_oracle.auxiliary_ranges == [1:2, 3:4]
+        @test split_oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test BendersX.auxiliary_dimension.(split_children) == [2, 2]
         @test all(length(child.dcglp[:st]) == master.dim_t for child in split_children)
         @test getfield.(split_children, :active_t_indices) == [[1, 2], [3, 4]]
@@ -223,7 +223,7 @@ end
         )
         @test classical_env.termination_status == Optimal()
         @test classical_master.dim_t == data.n_scenarios
-        @test classical_oracle.auxiliary_ranges == [1:1, 2:2]
+        @test classical_oracle.auxiliary_indices == [[1], [2]]
         @test isapprox(classical_env.obj_value, extensive_objective; atol = 1.0e-6)
 
         knapsack_env, knapsack_master, knapsack_oracle = solve_suflp_benders(
@@ -242,7 +242,7 @@ end
         )
         @test knapsack_env.termination_status == Optimal()
         @test knapsack_master.dim_t == data.n_customers * data.n_scenarios
-        @test knapsack_oracle.auxiliary_ranges == [1:2, 3:4]
+        @test knapsack_oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test isapprox(knapsack_env.obj_value, extensive_objective; atol = 1.0e-6)
     end
 end

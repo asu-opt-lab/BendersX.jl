@@ -127,8 +127,9 @@ Construct a split oracle using two typical oracles, a normalization scheme,
 and the specified split-oracle configuration. The two component oracles must
 have the same auxiliary-variable dimension. When both components are
 `SeparableOracle`s, they must describe the same subproblems and global
-auxiliary blocks. The DCGLP always uses the master's complete auxiliary space;
-coordinates outside those blocks remain inactive. Other component oracles
+auxiliary positions. The DCGLP always uses the master's complete auxiliary space;
+coordinates outside those positions are not updated by the component oracles,
+but remain part of the global DCGLP and returned cuts. Other component oracles
 must operate on the complete master auxiliary vector.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
@@ -184,11 +185,11 @@ mutable struct SplitOracle{
                 "SplitOracle: SeparableOracle components must have the same indices; " *
                 "got $(first_oracle.indices) and $(second_oracle.indices).",
             ))
-            first_oracle.auxiliary_ranges == second_oracle.auxiliary_ranges || throw(
+            first_oracle.auxiliary_indices == second_oracle.auxiliary_indices || throw(
                 DimensionMismatch(
                     "SplitOracle: SeparableOracle components must have the same " *
-                    "auxiliary_ranges; got $(first_oracle.auxiliary_ranges) and " *
-                    "$(second_oracle.auxiliary_ranges).",
+                    "auxiliary_indices; got $(first_oracle.auxiliary_indices) and " *
+                    "$(second_oracle.auxiliary_indices).",
                 ),
             )
             first_oracle.dim_global_auxiliary == second_oracle.dim_global_auxiliary || throw(
@@ -205,7 +206,7 @@ mutable struct SplitOracle{
             ))
             active_t_indices = reduce(
                 vcat,
-                collect.(first_oracle.auxiliary_ranges);
+                first_oracle.auxiliary_indices;
                 init = Int[],
             )
         else

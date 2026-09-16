@@ -27,7 +27,7 @@ function build_local_split_oracle(
             master,
             [child];
             indices = [scenario],
-            auxiliary_ranges = [block],
+            auxiliary_indices = [collect(block)],
         )
     end
 
