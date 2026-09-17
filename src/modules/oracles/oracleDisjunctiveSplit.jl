@@ -155,83 +155,99 @@ mutable struct SplitOracle{
         normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
     ) where {
-        T1<:AbstractOracle,
-        T2<:AbstractOracle,
+        T1 <: AbstractOracle,
+        T2 <: AbstractOracle,
     }
         all(is_typical_oracle, typical_oracles) || throw(
-            ArgumentError("SplitOracle: both component oracles must be typical oracles."),
-        )
-
-        dims = auxiliary_dimension.(typical_oracles)
-        length(unique(dims)) == 1 || throw(
-            DimensionMismatch(
-                "SplitOracle: typical oracles must have the same " *
-                "auxiliary-variable dimension; got $(dims).",
+            ArgumentError(
+                "SplitOracle: both supplied oracles must be typical oracles."
             ),
         )
-        dim_auxiliary = first(dims)
 
-        # SeparableOracle components must agree on the selected part of the
-        # global auxiliary space represented by this SplitOracle.
-        separable_components = [oracle isa SeparableOracle for oracle in typical_oracles]
-        all(separable_components) || !any(separable_components) || throw(ArgumentError(
-            "SplitOracle: component oracles must either both be SeparableOracles " *
-            "or both operate on the complete auxiliary space.",
-        ))
+        auxiliary_dimensions = auxiliary_dimension.(typical_oracles)
+        length(unique(auxiliary_dimensions)) == 1 || throw(
+            DimensionMismatch(
+                "SplitOracle: typical oracles must have the same " *
+                "auxiliary dimension; got $(auxiliary_dimensions).",
+            ),
+        )
+        dim_auxiliary = first(auxiliary_dimensions)
 
-        if all(separable_components)
+        # If either typical oracle is a SeparableOracle, both must be SeparableOracles 
+        separable_typical_oracles = [oracle isa SeparableOracle for oracle in typical_oracles]
+
+        any(separable_typical_oracles) && !all(separable_typical_oracles) && throw(
+            ArgumentError(
+                "SplitOracle: the two typical oracles must either both be " *
+                "SeparableOracles or neither be a SeparableOracle.",
+            ),
+        )
+
+        if all(separable_typical_oracles)
             first_oracle, second_oracle = typical_oracles
-            first_oracle.indices == second_oracle.indices || throw(ArgumentError(
-                "SplitOracle: SeparableOracle components must have the same indices; " *
-                "got $(first_oracle.indices) and $(second_oracle.indices).",
-            ))
-            first_oracle.auxiliary_indices == second_oracle.auxiliary_indices || throw(
-                DimensionMismatch(
-                    "SplitOracle: SeparableOracle components must have the same " *
-                    "auxiliary_indices; got $(first_oracle.auxiliary_indices) and " *
-                    "$(second_oracle.auxiliary_indices).",
+
+            first_oracle.subproblem_indices ==
+            second_oracle.subproblem_indices || throw(
+                ArgumentError(
+                    "SplitOracle: the two typical SeparableOracles must represent the same " *
+                    "subproblems; got $(first_oracle.subproblem_indices) and " *
+                    "$(second_oracle.subproblem_indices)."
                 ),
             )
-            first_oracle.dim_global_auxiliary == second_oracle.dim_global_auxiliary || throw(
+
+            first_oracle.auxiliary_indices ==
+            second_oracle.auxiliary_indices || throw(
                 DimensionMismatch(
-                    "SplitOracle: SeparableOracle components must have the same global " *
-                    "auxiliary dimension; got $(first_oracle.dim_global_auxiliary) and " *
+                    "SplitOracle: the two typical SeparableOracles must have the same " *
+                    "auxiliary_indices; got $(first_oracle.auxiliary_indices) and " *
+                    "$(second_oracle.auxiliary_indices)."
+                ),
+            )
+
+            first_oracle.dim_global_auxiliary ==
+            second_oracle.dim_global_auxiliary || throw(
+                DimensionMismatch(
+                    "SplitOracle: the two typical SeparableOracles must have the same " *
+                    "global auxiliary dimension; got " *
+                    "$(first_oracle.dim_global_auxiliary) and " *
                     "$(second_oracle.dim_global_auxiliary).",
                 ),
             )
-            first_oracle.dim_global_auxiliary == master.dim_t || throw(DimensionMismatch(
-                "SplitOracle: component global auxiliary dimension " *
-                "$(first_oracle.dim_global_auxiliary) must equal master.dim_t " *
-                "($(master.dim_t)).",
-            ))
-            active_t_indices = reduce(
-                vcat,
-                first_oracle.auxiliary_indices;
-                init = Int[],
+
+            first_oracle.dim_global_auxiliary == master.dim_t || throw(
+                DimensionMismatch(
+                    "SplitOracle: the typical SeparableOracle's global auxiliary dimension " *
+                    "$(first_oracle.dim_global_auxiliary) must equal " *
+                    "master.dim_t ($(master.dim_t)).",
+                ),
             )
+
+            active_t_indices = vcat(first_oracle.auxiliary_indices...)
         else
-            dim_auxiliary == master.dim_t || throw(DimensionMismatch(
-                "SplitOracle: a component that is not a SeparableOracle must have " *
-                "auxiliary dimension master.dim_t ($(master.dim_t)); got " *
-                "$dim_auxiliary.",
-            ))
+            dim_auxiliary == master.dim_t || throw(
+                DimensionMismatch(
+                    "SplitOracle: each typical oracle must represent the full auxiliary " *
+                    "space when the typical oracles are not SeparableOracles; expected " *
+                    "auxiliary dimension $(master.dim_t), got $dim_auxiliary.",
+                ),
+            )
+
             active_t_indices = collect(1:master.dim_t)
         end
-
         dcglp = build_dcglp(
             master,
             normalization,
             param;
             dim_t = master.dim_t,
         )
-        
+
         disjunctive_cuts_by_index = [
             Hyperplane[] for _ in 1:master.dim_x
         ]
         disjunctive_cuts = Hyperplane[]
         splits = Tuple{SparseVector{Float64,Int},Float64}[]
 
-        new{T1, T2, typeof(normalization)}(
+        new{T1,T2,typeof(normalization)}(
             param,
             normalization,
             dcglp,
@@ -276,19 +292,10 @@ function generate_cuts(
     oracle::SplitOracle,
     x_value::Vector{Float64},
     t_value::Vector{Float64};
-    tol_normalize = 1.0, # just to match the signature of the typical oracle
+    tol_normalize = 1.0, # included for interface compatibility
     time_limit::Float64 = 3600.0
 )
     tic = time()
-
-    dim_global_auxiliary = length(oracle.dcglp[:st])
-    length(t_value) == dim_global_auxiliary || throw(
-        DimensionMismatch(
-            "SplitOracle received t_value with length $(length(t_value)); " *
-            "expected the master auxiliary dimension " *
-            "$dim_global_auxiliary.",
-        ),
-    )
 
     !is_applicable(oracle.normalization, oracle, x_value, t_value) &&
         return generate_cuts(oracle.typical_oracles[1], x_value, t_value; time_limit = max(time_limit - (time() - tic), 0.0))
