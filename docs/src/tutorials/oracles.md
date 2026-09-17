@@ -229,13 +229,19 @@ These two composition orders have different meanings:
 - `SeparableOracle` containing several `SplitOracle`s evaluates one global-space
   DCGLP per assigned group and directly combines the returned global cuts.
 
+`SplitOracle` always operates on the master's complete global auxiliary vector.
+To separate only a subset of subproblems, represent that subset through both
+typical `SeparableOracle`s. Those `SeparableOracle`s map their represented
+subproblems to the global auxiliary space, while `SplitOracle.generate_cuts`
+continues to receive the complete global `t`.
+
 `SplitOracle` obtains the number of represented auxiliary variables from its
 component oracles, while the DCGLP dimension remains `master.dim_t`. A typical
 oracle uses dimension one by default and overrides `auxiliary_dimension` only
 when it represents a larger auxiliary space. `SeparableOracle` reports the sum
 of its component-oracle dimensions. The two components of a `SplitOracle` must
 report the same dimension and, when they are `SeparableOracle`s, must carry
-identical `indices` and `auxiliary_indices`.
+identical `subproblem_indices` and `auxiliary_indices`.
 
 ### Configuring `SplitOracle` Behavior
 

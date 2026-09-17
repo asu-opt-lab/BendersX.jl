@@ -106,8 +106,7 @@ dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the m
 Construct a `SeparableOracle` from already configured component oracles. Each
 entry of `subproblem_indices` lists the subproblems represented by the corresponding
 component. A vector of integers remains shorthand for one subproblem per
-component. When `auxiliary_indices` is omitted, the supplied oracles must
-represent the full auxiliary space and their positions are inferred consecutively.
+component. When `auxiliary_indices` is omitted, each component must representexactly one subproblem and one auxiliary variable; its `subproblem_indices` entry also determines its global auxiliary index.
 
     SeparableOracle(
         data,
@@ -124,9 +123,11 @@ represent the full auxiliary space and their positions are inferred consecutivel
 
 Homogeneous convenience constructor. By default, it constructs one oracle for
 each of the `N` subproblems. A subset can be constructed by specifying global
-`subproblem_indices`. For a subset, `auxiliary_indices` must give the ordered positions
-in the full master auxiliary space. The same `sub_oracle_param` and `model`
-function are passed to every constructed sub-oracle.
+`subproblem_indices`. When each constructed oracle represents one auxiliary
+variable, `auxiliary_indices` may be omitted and `subproblem_indices` also
+determine the global auxiliary positions. Otherwise, `auxiliary_indices` must give the ordered positions in the full master auxiliary space. The same
+`sub_oracle_param` and `model` function are passed to every constructed
+sub-oracle.
 
 For a full `SeparableOracle`, the sum of the sub-oracles'
 [`auxiliary_dimension`](@ref) values must equal `master.dim_t`. For a
