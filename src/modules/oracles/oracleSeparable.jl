@@ -88,7 +88,7 @@ param::SeparableOracleParam: Parameters controlling separable evaluation.
 oracles::Vector{AbstractOracle}: Configured oracles for the represented subproblems.
 subproblem_indices::Vector{Vector{Int}}: Global subproblem indices represented by each
 component oracle.
-auxiliary_indices::Vector{Vector{Int}}: Ordered global auxiliary-variable
+auxiliary_indices::Vector{Vector{Int}}: Global auxiliary-variable
 positions corresponding to each local sub-oracle's auxiliary coordinates.
 dim_auxiliary::Int: Total auxiliary-variable dimension represented by the contained sub-oracles.
 dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the master.
@@ -105,8 +105,7 @@ dim_global_auxiliary::Int: Dimension of the full global auxiliary space of the m
 
 Construct a `SeparableOracle` from already configured component oracles. Each
 entry of `subproblem_indices` lists the subproblems represented by the corresponding
-component. A vector of integers remains shorthand for one subproblem per
-component. When `auxiliary_indices` is omitted, each component must representexactly one subproblem and one auxiliary variable; its `subproblem_indices` entry also determines its global auxiliary index.
+component oracle. A vector of integers remains shorthand for one subproblem per component oracle. When `auxiliary_indices` is omitted, each subproblem must represent one auxiliary variable, and `subproblem_indices` also determine the global auxiliary indices.
 
     SeparableOracle(
         data,
@@ -123,9 +122,10 @@ component. When `auxiliary_indices` is omitted, each component must representexa
 
 Homogeneous convenience constructor. By default, it constructs one oracle for
 each of the `N` subproblems. A subset can be constructed by specifying global
-`subproblem_indices`. When each constructed oracle represents one auxiliary
+`subproblem_indices`. When each subproblem represents one auxiliary
 variable, `auxiliary_indices` may be omitted and `subproblem_indices` also
-determine the global auxiliary positions. Otherwise, `auxiliary_indices` must give the ordered positions in the full master auxiliary space. The same
+determine the global auxiliary positions. Otherwise, `auxiliary_indices` must
+give the positions in the full master auxiliary space. The same
 `sub_oracle_param` and `model` function are passed to every constructed
 sub-oracle.
 
@@ -209,16 +209,16 @@ mutable struct SeparableOracle <: AbstractOracle
         dim_auxiliary = sum(auxiliary_dimensions)
 
         if auxiliary_indices === nothing
-            all(group -> length(group) == 1, subproblem_groups) || throw(ArgumentError(
-                "SeparableOracle: when auxiliary_indices is omitted, each component " *
-                "oracle must represent exactly one subproblem.",
-            ))
-
-            all(==(1), auxiliary_dimensions) || throw(DimensionMismatch(
-                "SeparableOracle: when auxiliary_indices is omitted, each component " *
-                "oracle must represent exactly one auxiliary variable; got auxiliary " *
-                "dimensions $(auxiliary_dimensions).",
-            ))
+            for k in eachindex(subproblem_groups)
+                length(subproblem_groups[k]) == auxiliary_dimensions[k] || throw(
+                    DimensionMismatch(
+                        "SeparableOracle: when auxiliary_indices is omitted, " *
+                        "component oracle $k represents " *
+                        "$(length(subproblem_groups[k])) subproblems but has " *
+                        "auxiliary dimension $(auxiliary_dimensions[k]).",
+                    ),
+                )
+            end
 
             all(<=(master.dim_t), flat_subproblem_indices) || throw(ArgumentError(
                 "SeparableOracle: when auxiliary_indices is omitted, subproblem " *

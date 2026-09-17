@@ -387,7 +387,7 @@ end
             typical_pair;
             param = separable_split_param(),
         )
-        @test split.active_t_indices == [8, 2, 5]
+        @test split.auxiliary_indices == [8, 2, 5]
     end
 
     @testset "groups subproblem indices by component for nested composition" begin
@@ -444,11 +444,12 @@ end
             subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1], [2, 3, 4]],
         )
-        @test_throws ArgumentError SeparableOracle(
+        inferred_mapping = SeparableOracle(
             master,
-            [two_dimensional];
-            subproblem_indices = [[1, 2]],
+            [two_dimensional, two_dimensional];
+            subproblem_indices = [[1, 3], [2, 4]],
         )
+        @test inferred_mapping.auxiliary_indices == [[1, 3], [2, 4]]
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [two_dimensional];
@@ -517,7 +518,7 @@ end
         split_children = [local_split_oracle(data, master, j) for j in 1:2]
         oracle = SeparableOracle(master, split_children)
 
-        @test getfield.(split_children, :active_t_indices) == [[1], [2]]
+        @test getfield.(split_children, :auxiliary_indices) == [[1], [2]]
         @test length.(getindex.(getfield.(split_children, :dcglp), Ref(:st))) == [2, 2]
         for _ in 1:2
             is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -541,7 +542,7 @@ end
         split = grouped_split_oracle(data, master, [2, 4])
 
         @test split.dim_auxiliary == 2
-        @test split.active_t_indices == [2, 4]
+        @test split.auxiliary_indices == [2, 4]
         @test length(split.dcglp[:st]) == 4
         @test_throws DimensionMismatch BendersX.generate_cuts(
             split,
@@ -657,7 +658,7 @@ end
         )
 
         @test oracle.subproblem_indices == [[1, 2], [3, 4]]
-        @test vcat(first_split.active_t_indices, second_split.active_t_indices) == 1:4
+        @test vcat(first_split.auxiliary_indices, second_split.auxiliary_indices) == 1:4
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
             oracle,
@@ -708,7 +709,7 @@ end
         @test split.dim_auxiliary == 1
         @test BendersX.auxiliary_dimension(split) == 1
         @test length(split.dcglp[:st]) == master.dim_t
-        @test split.active_t_indices == [1]
+        @test split.auxiliary_indices == [1]
         @test normalization.core_direction_x == zeros(master.dim_x)
         @test normalization.core_direction_t == ones(master.dim_t)
 

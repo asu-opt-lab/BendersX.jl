@@ -127,7 +127,7 @@ oracle = SeparableOracle(master, split_oracles)
 Each component declares the number of represented `t` values through
 `auxiliary_dimension`. For leaf components, the wrapper extracts the assigned
 coordinates of the global `t` and embeds each returned cut into the master
-auxiliary space. The ordered `auxiliary_indices` mapping need not be
+auxiliary space. The `auxiliary_indices` mapping need not be
 contiguous. Contained `SeparableOracle`s and `SplitOracle`s already receive the
 global `t` and return global cuts. Their grouped `subproblem_indices`, such as
 `[[1, 2], [3, 4]]`, record which subproblems belong to each component.

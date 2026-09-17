@@ -105,7 +105,7 @@ Split-based disjunctive Benders oracle.
 - `typical_oracles::Tuple{<:AbstractOracle,<:AbstractOracle}`: Typical oracles associated with the two sides of the split.
 - `dim_auxiliary::Int`: Number of auxiliary variables represented by the
   component oracles.
-- `active_t_indices::Vector{Int}`: Positions in the master's auxiliary vector
+- `auxiliary_indices::Vector{Int}`: Positions in the master's auxiliary vector
   represented by the component oracles.
 - `disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}`: Previously generated disjunctive cuts grouped by split index.
 - `disjunctive_cuts::Vector{Hyperplane}`: Collection of generated disjunctive cuts.
@@ -147,7 +147,7 @@ mutable struct SplitOracle{
     disjunctive_cuts::Vector{Hyperplane}
     splits::Vector{Tuple{SparseVector{Float64, Int}, Float64}}
     dim_auxiliary::Int
-    active_t_indices::Vector{Int}
+    auxiliary_indices::Vector{Int}
 
     function SplitOracle(
         master::AbstractMaster,
@@ -222,7 +222,7 @@ mutable struct SplitOracle{
                 ),
             )
 
-            active_t_indices = vcat(first_oracle.auxiliary_indices...)
+            auxiliary_indices = vcat(first_oracle.auxiliary_indices...)
         else
             dim_auxiliary == master.dim_t || throw(
                 DimensionMismatch(
@@ -232,7 +232,7 @@ mutable struct SplitOracle{
                 ),
             )
 
-            active_t_indices = collect(1:master.dim_t)
+            auxiliary_indices = collect(1:master.dim_t)
         end
         dcglp = build_dcglp(
             master,
@@ -256,7 +256,7 @@ mutable struct SplitOracle{
             disjunctive_cuts,
             splits,
             dim_auxiliary,
-            active_t_indices,
+            auxiliary_indices,
         )
     end
 end

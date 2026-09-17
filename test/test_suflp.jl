@@ -214,7 +214,7 @@ end
         @test split_oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test BendersX.auxiliary_dimension.(split_children) == [2, 2]
         @test all(length(child.dcglp[:st]) == master.dim_t for child in split_children)
-        @test getfield.(split_children, :active_t_indices) == [[1, 2], [3, 4]]
+        @test getfield.(split_children, :auxiliary_indices) == [[1, 2], [3, 4]]
     end
 
     @testset "Benders formulations match the extensive form" begin

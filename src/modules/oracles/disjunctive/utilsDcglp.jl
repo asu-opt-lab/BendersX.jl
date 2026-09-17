@@ -294,7 +294,7 @@ function solve_dcglp!(
         if all(log.iterations[end].is_in_L) # optimal termination with both points in the oracle feasible region
             return true,
                    [Hyperplane(length(x_value), length(t_value))],
-                   deepcopy(t_value[oracle.active_t_indices])
+                   deepcopy(t_value[oracle.auxiliary_indices])
         end
 
         # fallback to typical oracle since no meaningful disjunctive cut can be constructed from the DCGLP solution
@@ -366,7 +366,7 @@ function collect_dcglp_benders_cuts!(
                     time_limit = get_sec_remaining(log.start_time, time_limit),
                 )
                 state.f_x[i] = copy(t_prime)
-                state.f_x[i][oracle.active_t_indices] = local_f_x
+                state.f_x[i][oracle.auxiliary_indices] = local_f_x
 
                 if !state.is_in_L[i]
                     for k in 1:2
