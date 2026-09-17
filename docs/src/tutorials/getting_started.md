@@ -93,7 +93,7 @@ function update_master_model!(model::Model, data::CFLPData)
     return (x = x, ), t
 end
 
-function update_sub_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers   
     @variable(model, y[1:I, 1:J] >= 0)
     cost_demands = data.costs .* data.demands'
@@ -194,14 +194,14 @@ master = Master(
 ### Subproblem Modeling
 Subproblems are specified by the user through a model-update function:
 ```julia
-update_sub_model!(model::Model, data, scen_idx::Int; kwargs...)
+update_sub_model!(model::Model, data, subproblem_idx::Int; kwargs...)
 ```
 Here, `kwargs...` contains the symbolic names of the master variables that appear in the subproblem. This allows users to formulate the subproblem in JuMP **while referencing these master variables directly**, without explicitly adding them to the subproblem model.
 
 ### Example 1
 [The CFLP subproblem](@ref cflp-sub) can be implemented like this:
 ```julia
-function update_sub_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers   
     @variable(model, y[1:I, 1:J] >= 0)
     cost_demands = data.costs .* data.demands'
@@ -266,7 +266,7 @@ function update_master_model!(model::Model, data::EmptyData)
     return (u = u, v = v, w = w), t
 end
 
-function update_sub_model!(model::Model, data::EmptyData, scen_idx::Int; u, v, w)
+function update_sub_model!(model::Model, data::EmptyData, subproblem_idx::Int; u, v, w)
     @variable(model, y[1:10] >= 0)
     @objective(model, Min, sum(y))
     @constraint(model, y .<= u)
@@ -282,7 +282,7 @@ end
     * **Explicit keyword names**: The keyword argument names in the subproblem function must exactly match the names returned by the master model-update function.
     * **No redeclaration**: Do not redeclare master variables inside the subproblem; they should only be referenced via keyword arguments.
     * **Indexing with symbolic sets**: When using `DenseAxisArray` or `SparseAxisArray`, ensure that symbolic indices (e.g., `:A`) are used consistently.
-    * **Scenario index usage**: If `scen_idx` is unused, it can be safely ignored, but it must still appear in the function signature.
+    * **Subproblem index usage**: If `subproblem_idx` is unused, it can be safely ignored, but it must still appear in the function signature.
 
 ---
 

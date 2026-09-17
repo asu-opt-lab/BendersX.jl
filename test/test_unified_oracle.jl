@@ -72,7 +72,7 @@ end
         # Test that UnifiedOracle can be constructed
         data = create_unified_test_data()
         
-        function update_sub_basic_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_basic_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             
@@ -101,7 +101,7 @@ end
         data = create_unified_test_data()
         mip_opt = solve_mip_unified_reference(data)
         
-        function update_sub_compare_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_compare_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             
@@ -158,7 +158,7 @@ end
         
         data = create_unified_test_data()
         
-        function update_sub_param_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_param_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             
@@ -185,7 +185,7 @@ end
         data = create_unified_test_data()
         mip_opt = solve_mip_unified_reference(data)
         
-        function update_sub_w0_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_w0_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             
@@ -227,7 +227,7 @@ end
         # Test that interval constraints are properly split and accepted
         data = create_unified_test_data()
 
-        function update_sub_interval_accept_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_interval_accept_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -268,7 +268,7 @@ end
 
         data = UnifiedIntervalReformData(2)
 
-        function update_sub_interval_reform_model!(model::Model, data::UnifiedIntervalReformData, scen_idx::Int; x)
+        function update_sub_interval_reform_model!(model::Model, data::UnifiedIntervalReformData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             @variable(model, y >= 0)
@@ -297,7 +297,7 @@ end
         # Test that vectorized constraints (A*y == b form) are properly split and accepted
         data = create_unified_test_data()
 
-        function update_sub_vectorized_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_vectorized_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -331,7 +331,7 @@ end
         # Test with ALL valid patterns from test_validate_LP.jl
         data = create_unified_test_data()
 
-        function update_sub_all_patterns_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_all_patterns_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -367,7 +367,7 @@ end
         data = create_unified_test_data()
         mip_opt = solve_mip_unified_reference(data)
 
-        function update_sub_interval_converge_model!(model::Model, data::SimpleUnifiedTestData, scen_idx::Int; x)
+        function update_sub_interval_converge_model!(model::Model, data::SimpleUnifiedTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -418,7 +418,7 @@ end
             # Test that σ variable is free (no lower/upper bound)
             data = ReformTestData(2)
 
-            function update_sub_sigma_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_sigma_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -442,7 +442,7 @@ end
         @testset "Objective becomes min σ" begin
             data = ReformTestData(2)
 
-            function update_sub_obj_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_obj_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -467,7 +467,7 @@ end
             # Verify lb (x + σ >= value) and ub (x - σ <= value) constraints
             data = ReformTestData(2)
 
-            function update_sub_fix_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_fix_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -509,7 +509,7 @@ end
             data = ReformTestData(2)
             w0 = 2.5
 
-            function update_sub_objcon_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_objcon_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -538,7 +538,7 @@ end
             # Test that problem constraints are correctly modified with ±σ
             data = ReformTestData(2)
 
-            function update_sub_relax_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_relax_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -572,7 +572,7 @@ end
             # Test that == constraints are split into >= and <= with ±σ
             data = ReformTestData(2)
 
-            function update_sub_eq_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_eq_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -611,7 +611,7 @@ end
             # Constraints not containing x should NOT have σ added
             data = ReformTestData(2)
 
-            function update_sub_nox_model!(model::Model, data::ReformTestData, scen_idx::Int; x)
+            function update_sub_nox_model!(model::Model, data::ReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 

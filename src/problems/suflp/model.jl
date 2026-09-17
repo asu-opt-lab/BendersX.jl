@@ -46,17 +46,17 @@ function update_knapsack_master_model!(model::Model, data::SUFLPData)
 end
 
 """
-    update_sub_model!(model::Model, data::SUFLPData, scen_idx::Int; x)
+    update_sub_model!(model::Model, data::SUFLPData, subproblem_idx::Int; x)
 
 Formulate one unweighted SUFLP scenario subproblem. Scenario probabilities are
 applied only in the master objective; keeping them out of the subproblem
 prevents double weighting of recourse values and Benders cuts.
 """
-function update_sub_model!(model::Model, data::SUFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::SUFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)
 
-    cost_demands = data.costs .* data.demands[scen_idx]'
+    cost_demands = data.costs .* data.demands[subproblem_idx]'
     @objective(model, Min, sum(cost_demands .* y))
     @constraint(model, demand[j in 1:J], sum(y[:, j]) == 1)
     @constraint(model, facility_open[i in 1:I, j in 1:J], y[i, j] <= x[i])
@@ -64,16 +64,16 @@ function update_sub_model!(model::Model, data::SUFLPData, scen_idx::Int; x)
 end
 
 """
-    update_sub_gbc_model!(model::Model, data::SUFLPData, scen_idx::Int; x)
+    update_sub_gbc_model!(model::Model, data::SUFLPData, subproblem_idx::Int; x)
 
 Formulate one SUFLP scenario subproblem while returning `y[i, j] <= x[i]` as
 generalized bound constraints.
 """
-function update_sub_gbc_model!(model::Model, data::SUFLPData, scen_idx::Int; x)
+function update_sub_gbc_model!(model::Model, data::SUFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)
 
-    cost_demands = data.costs .* data.demands[scen_idx]'
+    cost_demands = data.costs .* data.demands[subproblem_idx]'
     @objective(model, Min, sum(cost_demands .* y))
     @constraint(model, demand[j in 1:J], sum(y[:, j]) == 1)
 

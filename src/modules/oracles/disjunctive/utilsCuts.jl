@@ -15,7 +15,7 @@ function add_disjunctive_cuts!(oracle::AbstractDisjunctiveOracle, ::DisjunctiveC
 
     index = get_split_index(oracle)
     cuts = if index > 1
-        reduce(vcat, oracle.disjunctive_cuts_by_index[1:index-1]; init = Hyperplane[])
+        vcat(oracle.disjunctive_cuts_by_index[1:index-1]...)
     else
         Hyperplane[]
     end

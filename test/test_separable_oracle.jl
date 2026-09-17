@@ -35,13 +35,13 @@ end
 function update_separable_oracle_sub!(
     model::Model,
     data::SeparableOracleTestData,
-    scen_idx::Int;
+    subproblem_idx::Int;
     x,
 )
     @variable(model, y[1:2] >= 0)
     @constraint(model, sum(y) == 1)
     @constraint(model, [i in 1:2], y[i] <= x[i])
-    @objective(model, Min, sum(data.costs[i, scen_idx] * y[i] for i in 1:2))
+    @objective(model, Min, sum(data.costs[i, subproblem_idx] * y[i] for i in 1:2))
     return nothing
 end
 
@@ -59,21 +59,25 @@ function separable_oracle_fixture(n_scenarios::Int = 2)
     return data, master
 end
 
-function classical_separable_component(data, master, indices::Vector{Int})
+function classical_separable_component(
+    data,
+    master,
+    subproblem_indices::Vector{Int},
+)
     children = [
         ClassicalOracle(
             data,
             master;
             model = update_separable_oracle_sub!,
-            scen_idx = index,
+            subproblem_idx = subproblem_idx,
             optimizer = separable_oracle_optimizer(),
-        ) for index in indices
+        ) for subproblem_idx in subproblem_indices
     ]
     return SeparableOracle(
         master,
         children;
-        indices = indices,
-        auxiliary_indices = [[index] for index in indices],
+        subproblem_indices = subproblem_indices,
+        auxiliary_indices = [[subproblem_idx] for subproblem_idx in subproblem_indices],
     )
 end
 
@@ -134,7 +138,7 @@ function BendersX.generate_cuts(
 end
 
 struct HomogeneousDisjunctiveOracle <: BendersX.AbstractDisjunctiveOracle
-    scen_idx::Int
+    subproblem_idx::Int
 end
 
 BendersX.auxiliary_dimension(::HomogeneousDisjunctiveOracle) = 1
@@ -143,11 +147,11 @@ function HomogeneousDisjunctiveOracle(
     data,
     master::BendersX.AbstractMaster;
     model = update_sub_model!,
-    scen_idx::Int,
+    subproblem_idx::Int,
     param::BendersX.AbstractOracleParam,
     optimizer = nothing,
 )
-    return HomogeneousDisjunctiveOracle(scen_idx)
+    return HomogeneousDisjunctiveOracle(subproblem_idx)
 end
 
 function BendersX.generate_cuts(
@@ -159,8 +163,8 @@ function BendersX.generate_cuts(
 )
     cut = BendersX.Hyperplane(length(x_value), 1)
     cut.a_t[1] = -1.0
-    cut.a_0 = Float64(oracle.scen_idx)
-    return false, [cut], [Float64(oracle.scen_idx)]
+    cut.a_0 = Float64(oracle.subproblem_idx)
+    return false, [cut], [Float64(oracle.subproblem_idx)]
 end
 
 struct SeparableContractOracle <: BendersX.AbstractTypicalOracle
@@ -188,9 +192,9 @@ function BendersX.generate_cuts(
     return oracle.is_in_L, [cut], fill(7.0, oracle.objective_count)
 end
 
-function local_split_oracle(data, master, scen_idx::Int; reuse_dcglp::Bool = true)
+function local_split_oracle(data, master, subproblem_idx::Int; reuse_dcglp::Bool = true)
     typical_pair = ntuple(2) do _
-        classical_separable_component(data, master, [scen_idx])
+        classical_separable_component(data, master, [subproblem_idx])
     end
     return SplitOracle(
         master,
@@ -199,9 +203,9 @@ function local_split_oracle(data, master, scen_idx::Int; reuse_dcglp::Bool = tru
     )
 end
 
-function grouped_split_oracle(data, master, indices::Vector{Int})
+function grouped_split_oracle(data, master, subproblem_indices::Vector{Int})
     typical_pair = ntuple(2) do _
-        classical_separable_component(data, master, indices)
+        classical_separable_component(data, master, subproblem_indices)
     end
     return SplitOracle(
         master,
@@ -221,7 +225,7 @@ end
         ]
         oracle = SeparableOracle(master, children)
 
-        @test oracle.indices == [[1], [2]]
+        @test oracle.subproblem_indices == [[1], [2]]
         is_in_L, cuts, objectives = BendersX.generate_cuts(
             oracle,
             [0.5, 0.5],
@@ -251,8 +255,8 @@ end
             data.n_scenarios;
             optimizer = nothing,
         )
-        @test getfield.(oracle.oracles, :scen_idx) == [1, 2]
-        @test oracle.indices == [[1], [2]]
+        @test getfield.(oracle.oracles, :subproblem_idx) == [1, 2]
+        @test oracle.subproblem_indices == [[1], [2]]
         _, cuts, objectives = BendersX.generate_cuts(oracle, [0.0, 0.0], [0.0, 0.0])
         @test objectives == [1.0, 2.0]
         @test collect(cuts[1].a_t) == [-1.0, 0.0]
@@ -274,11 +278,12 @@ end
         )
         oracle = SeparableOracle(
             master,
-            [UFLKnapsackOracle(data), UFLKnapsackOracle(data)],
+            [UFLKnapsackOracle(data), UFLKnapsackOracle(data)];
+            auxiliary_indices = [[1, 2], [3, 4]],
         )
 
         @test oracle.dim_auxiliary == 4
-        @test oracle.indices == [[1], [2]]
+        @test oracle.subproblem_indices == [[1], [2]]
         @test oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test BendersX.auxiliary_dimension(oracle) == 4
 
@@ -298,7 +303,7 @@ end
         ]
     end
 
-    @testset "extracts and embeds selected global auxiliary coordinates" begin
+    @testset "infers auxiliary indices from subproblem indices" begin
         _, master = separable_oracle_fixture(10)
         selected_indices = [2, 3, 10]
         children = [
@@ -316,8 +321,7 @@ end
         oracle = SeparableOracle(
             master,
             children;
-            indices = selected_indices,
-            auxiliary_indices = [[2], [3], [10]],
+            subproblem_indices = selected_indices,
         )
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -333,7 +337,8 @@ end
             ([3], [-3.0]),
             ([10], [-10.0]),
         ]
-        @test oracle.indices == [[2], [3], [10]]
+        @test oracle.subproblem_indices == [[2], [3], [10]]
+        @test oracle.auxiliary_indices == [[2], [3], [10]]
         @test oracle.dim_auxiliary == 3
         @test oracle.dim_global_auxiliary == 10
     end
@@ -353,7 +358,7 @@ end
         oracle = SeparableOracle(
             master,
             [child];
-            indices = [[8, 2, 5]],
+            subproblem_indices = [[8, 2, 5]],
             auxiliary_indices = [[8, 2, 5]],
         )
 
@@ -373,7 +378,7 @@ end
             SeparableOracle(
                 master,
                 [AuxiliaryDimensionTestOracle(3)];
-                indices = [[8, 2, 5]],
+                subproblem_indices = [[8, 2, 5]],
                 auxiliary_indices = [[8, 2, 5]],
             )
         end
@@ -385,18 +390,18 @@ end
         @test split.active_t_indices == [8, 2, 5]
     end
 
-    @testset "groups indices by component for nested composition" begin
+    @testset "groups subproblem indices by component for nested composition" begin
         data, master = separable_oracle_fixture(4)
         first_group = classical_separable_component(data, master, [1, 2])
         second_group = classical_separable_component(data, master, [3, 4])
         oracle = SeparableOracle(
             master,
             [first_group, second_group];
-            indices = [[1, 2], [3, 4]],
+            subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1, 2], [3, 4]],
         )
 
-        @test oracle.indices == [[1, 2], [3, 4]]
+        @test oracle.subproblem_indices == [[1, 2], [3, 4]]
         @test oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test oracle.dim_auxiliary == 4
         @test oracle.dim_global_auxiliary == 4
@@ -424,36 +429,46 @@ end
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
-            indices = [[1, 2]],
+            subproblem_indices = [[1, 2]],
             auxiliary_indices = [[1, 2], [3, 4]],
         )
         @test_throws ArgumentError SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
-            indices = [[1, 2], [2, 3]],
+            subproblem_indices = [[1, 2], [2, 3]],
             auxiliary_indices = [[1, 2], [3, 4]],
         )
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
-            indices = [[1, 2], [3, 4]],
+            subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1], [2, 3, 4]],
+        )
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [two_dimensional];
+            subproblem_indices = [[1, 2]],
         )
         @test_throws DimensionMismatch SeparableOracle(
             master,
             [two_dimensional];
-            indices = [[1, 2]],
+            subproblem_indices = [1],
+        )
+        @test_throws ArgumentError SeparableOracle(
+            master,
+            [AuxiliaryDimensionTestOracle(1)];
+            subproblem_indices = [5],
         )
         @test_throws ArgumentError SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
-            indices = [[1, 2], [3, 4]],
+            subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1, 2], [2, 3]],
         )
         @test_throws ArgumentError SeparableOracle(
             master,
             [two_dimensional, two_dimensional];
-            indices = [[1, 2], [3, 4]],
+            subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1, 2], [3, 5]],
         )
     end
@@ -555,19 +570,19 @@ end
         left = SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(1)];
-            indices = [2],
+            subproblem_indices = [2],
             auxiliary_indices = [[2]],
         )
         different_index = SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(1)];
-            indices = [3],
+            subproblem_indices = [3],
             auxiliary_indices = [[2]],
         )
         different_mapping = SeparableOracle(
             master,
             [AuxiliaryDimensionTestOracle(1)];
-            indices = [2],
+            subproblem_indices = [2],
             auxiliary_indices = [[3]],
         )
 
@@ -578,7 +593,7 @@ end
             err
         end
         @test index_error isa ArgumentError
-        @test occursin("same indices", sprint(showerror, index_error))
+        @test occursin("same subproblems", sprint(showerror, index_error))
 
         mapping_error = try
             SplitOracle(master, (left, different_mapping))
@@ -593,7 +608,7 @@ end
         different_global_dimension = SeparableOracle(
             other_master,
             [AuxiliaryDimensionTestOracle(1)];
-            indices = [2],
+            subproblem_indices = [2],
             auxiliary_indices = [[2]],
         )
         global_dimension_error = try
@@ -627,7 +642,7 @@ end
             err
         end
         @test dimension_error isa DimensionMismatch
-        @test occursin("master.dim_t", sprint(showerror, dimension_error))
+        @test occursin("full auxiliary space", sprint(showerror, dimension_error))
     end
 
     @testset "nested SeparableOracle combines SplitOracle groups" begin
@@ -637,11 +652,11 @@ end
         oracle = SeparableOracle(
             master,
             [first_split, second_split];
-            indices = [[1, 2], [3, 4]],
+            subproblem_indices = [[1, 2], [3, 4]],
             auxiliary_indices = [[1, 2], [3, 4]],
         )
 
-        @test oracle.indices == [[1, 2], [3, 4]]
+        @test oracle.subproblem_indices == [[1, 2], [3, 4]]
         @test vcat(first_split.active_t_indices, second_split.active_t_indices) == 1:4
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -657,7 +672,7 @@ end
         @test_throws ArgumentError SeparableOracle(
             master,
             [first_split, grouped_split_oracle(data, master, [2, 4])];
-            indices = [[1, 2], [2, 4]],
+            subproblem_indices = [[1, 2], [2, 4]],
             auxiliary_indices = [[1, 2], [2, 3]],
         )
     end
@@ -672,11 +687,11 @@ end
                         data,
                         master;
                         model = update_separable_oracle_sub!,
-                        scen_idx = 1,
+                        subproblem_idx = 1,
                         optimizer = separable_oracle_optimizer(),
                     ),
                 ];
-                indices = [1],
+                subproblem_indices = [1],
                 auxiliary_indices = [[1]],
             )
         end
@@ -718,7 +733,7 @@ end
                     data,
                     master;
                     model = update_separable_oracle_sub!,
-                    scen_idx = j,
+                    subproblem_idx = j,
                     optimizer = separable_oracle_optimizer(),
                 ) for j in 1:2
             ]
@@ -747,7 +762,7 @@ end
                 data,
                 master;
                 model = update_separable_oracle_sub!,
-                scen_idx = j,
+                subproblem_idx = j,
                 optimizer = separable_oracle_optimizer(),
             ) for j in 1:2
         ])

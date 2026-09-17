@@ -152,6 +152,11 @@ end
             master,
             UFLKnapsackOracle,
             data.n_scenarios;
+            auxiliary_indices = [
+                collect(((subproblem_idx - 1) * data.n_customers + 1):
+                        (subproblem_idx * data.n_customers))
+                for subproblem_idx in 1:data.n_scenarios
+            ],
             sub_oracle_param = UFLKnapsackOracleParam(),
             optimizer = suflp_test_optimizer(),
         )
@@ -183,8 +188,8 @@ end
                 typical_pair = ntuple(2) do _
                     SeparableOracle(
                         master,
-                        [UFLKnapsackOracle(data; scen_idx = scenario)];
-                        indices = [scenario],
+                        [UFLKnapsackOracle(data; subproblem_idx = scenario)];
+                        subproblem_indices = [scenario],
                         auxiliary_indices = [collect(block)],
                     )
                 end
@@ -196,7 +201,15 @@ end
                 )
             end for scenario in 1:data.n_scenarios
         ]
-        split_oracle = SeparableOracle(master, split_children)
+        split_oracle = SeparableOracle(
+            master,
+            split_children;
+            auxiliary_indices = [
+                collect(((subproblem_idx - 1) * data.n_customers + 1):
+                        (subproblem_idx * data.n_customers))
+                for subproblem_idx in 1:data.n_scenarios
+            ],
+        )
         @test split_oracle.dim_auxiliary == 4
         @test split_oracle.auxiliary_indices == [[1, 2], [3, 4]]
         @test BendersX.auxiliary_dimension.(split_children) == [2, 2]
@@ -234,6 +247,11 @@ end
                 master,
                 UFLKnapsackOracle,
                 data.n_scenarios;
+                auxiliary_indices = [
+                    collect(((subproblem_idx - 1) * data.n_customers + 1):
+                            (subproblem_idx * data.n_customers))
+                    for subproblem_idx in 1:data.n_scenarios
+                ],
                 sub_oracle_param = UFLKnapsackOracleParam(
                     add_only_violated_cuts = true,
                 ),

@@ -1,5 +1,5 @@
 """
-    UFLKnapsackOracle(data::SUFLPData; scen_idx, param = UFLKnapsackOracleParam())
+    UFLKnapsackOracle(data::SUFLPData; subproblem_idx, param = UFLKnapsackOracleParam())
 
 Construct a customer-disaggregated UFL knapsack oracle for one SUFLP
 scenario. Scenario probability is deliberately not applied here because it is
@@ -7,13 +7,13 @@ already represented by the auxiliary-variable coefficients in the master.
 """
 function UFLKnapsackOracle(
     data::SUFLPData;
-    scen_idx::Int,
+    subproblem_idx::Int,
     param::UFLKnapsackOracleParam = UFLKnapsackOracleParam(),
 )
     scenario_data = UFLPData(
         data.n_facilities,
         data.n_customers,
-        data.demands[scen_idx],
+        data.demands[subproblem_idx],
         data.fixed_costs,
         data.costs,
     )
@@ -24,7 +24,7 @@ end
     UFLKnapsackOracle(
         data::SUFLPData,
         master::Master;
-        scen_idx,
+        subproblem_idx,
         param = UFLKnapsackOracleParam(),
         ...,
     )
@@ -37,9 +37,9 @@ function UFLKnapsackOracle(
     data::SUFLPData,
     master::AbstractMaster;
     model = update_sub_model!,
-    scen_idx::Int,
+    subproblem_idx::Int,
     param::UFLKnapsackOracleParam = UFLKnapsackOracleParam(),
     optimizer = DEFAULT_OPTIMIZER,
 )
-    return UFLKnapsackOracle(data; scen_idx = scen_idx, param = param)
+    return UFLKnapsackOracle(data; subproblem_idx = subproblem_idx, param = param)
 end

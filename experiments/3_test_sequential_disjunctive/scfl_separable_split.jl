@@ -11,7 +11,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
 function update_separable_split_sub_gbc_model!(
     model::Model,
     data::SCFLPData,
-    scen_idx::Int;
+    subproblem_idx::Int;
     x,
 )
     subproblem_optimizer = optimizer_with_attributes(
@@ -26,13 +26,13 @@ function update_separable_split_sub_gbc_model!(
 
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)
-    cost_demands = data.costs .* data.demands[scen_idx]'
+    cost_demands = data.costs .* data.demands[subproblem_idx]'
     @objective(model, Min, sum(cost_demands .* y))
     @constraint(model, demand[j in 1:J], sum(y[:, j]) == 1)
     @constraint(
         model,
         capacity[i in 1:I],
-        sum(data.demands[scen_idx][j] * y[i, j] for j in 1:J) <=
+        sum(data.demands[subproblem_idx][j] * y[i, j] for j in 1:J) <=
         data.capacities[i] * x[i],
     )
 
@@ -56,14 +56,14 @@ function build_local_split_oracle(
             data,
             master;
             model = model,
-            scen_idx = scenario,
+            subproblem_idx = scenario,
             param = deepcopy(oracle_param),
             optimizer = optimizer,
         )
         SeparableOracle(
             master,
             [child];
-            indices = [scenario],
+            subproblem_indices = [scenario],
             auxiliary_indices = [[scenario]],
         )
     end

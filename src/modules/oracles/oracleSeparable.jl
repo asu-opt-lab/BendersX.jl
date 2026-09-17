@@ -3,18 +3,21 @@
         data,
         master::AbstractMaster;
         model = update_sub_model!,
-        scen_idx::Int,
+        subproblem_idx::Int,
         param::AbstractOracleParam,
         optimizer = DEFAULT_OPTIMIZER,
     ) where T <: AbstractOracle
 
-Scenario-specific constructor interface used by the homogeneous convenience constructor of [`SeparableOracle`](@ref).
+Subproblem-specific constructor interface used by the homogeneous convenience constructor of [`SeparableOracle`](@ref).
 
 When calling
 
     SeparableOracle(data, master, T, N; ...)
 
-`SeparableOracle` constructs one oracle of type `T` for each subproblem selected by `indices` (all `1:N` by default). To support this form of construction, `T` must implement the constructor above. For global subproblem `j`, `SeparableOracle` calls the constructor with `scen_idx = j`.
+`SeparableOracle` constructs one oracle of type `T` for each subproblem selected by
+`subproblem_indices` (all `1:N` by default). To support this form of construction,
+`T` must implement the constructor above. For global subproblem `j`,
+`SeparableOracle` calls the constructor with `subproblem_idx = j`.
 
 This constructor is required only for automatic homogeneous construction. It is not part of the general [`AbstractOracle`](@ref) interface. Oracles that do not implement this constructor can still be used with `SeparableOracle` by constructing them explicitly and passing them to
 
@@ -23,7 +26,7 @@ This constructor is required only for automatic homogeneous construction. It is 
 # Keywords
 
 - `model`: JuMP modeling function used to construct the subproblem.
-- `scen_idx`: Index of the scenario or independent subproblem represented by
+- `subproblem_idx`: Index of the independent subproblem represented by
   the constructed oracle.
 - `param`: Parameter object for the constructed oracle.
 - `optimizer`: Optimizer used by the constructed oracle.
@@ -34,7 +37,7 @@ Throws an [`UnimplementedInterfaceException`](@ref) when a subtype `T` does not 
 """
 (::Type{T})(data, master::AbstractMaster;
             model = update_sub_model!,
-            scen_idx::Int,
+            subproblem_idx::Int,
             param::AbstractOracleParam,
             optimizer = DEFAULT_OPTIMIZER) where T <: AbstractOracle =
     throw(UnimplementedInterfaceException(
@@ -45,7 +48,7 @@ Throws an [`UnimplementedInterfaceException`](@ref) when a subtype `T` does not 
         Expected constructor signature:
 
           $(T)(data, master::AbstractMaster;
-              model = update_sub_model!, scen_idx::Int, param::AbstractOracleParam,
+              model = update_sub_model!, subproblem_idx::Int, param::AbstractOracleParam,
               optimizer = ...)
 
         Define this constructor for $(T) in order to use it with `SeparableOracle`.
@@ -64,7 +67,7 @@ Parameters of the individual sub-oracles are stored by those oracles rather than
 See also: [`SeparableOracle`](@ref), [`AbstractOracleParam`](@ref)
 """
 mutable struct SeparableOracleParam <: AbstractOracleParam
-    # may contain parameters for scenario handling.
+    # May contain parameters for subproblem handling.
 end
 
 """
@@ -83,7 +86,7 @@ Sub-oracles may have different concrete types, parameter objects, and auxiliary-
 # Fields
 param::SeparableOracleParam: Parameters controlling separable evaluation.
 oracles::Vector{AbstractOracle}: Configured oracles for the represented subproblems.
-indices::Vector{Vector{Int}}: Global subproblem indices represented by each
+subproblem_indices::Vector{Vector{Int}}: Global subproblem indices represented by each
 component oracle.
 auxiliary_indices::Vector{Vector{Int}}: Ordered global auxiliary-variable
 positions corresponding to each local sub-oracle's auxiliary coordinates.
@@ -205,22 +208,24 @@ mutable struct SeparableOracle <: AbstractOracle
         dim_auxiliary = sum(auxiliary_dimensions)
 
         if auxiliary_indices === nothing
-            ## Issue 91: revise this case as the special case where
-            ## indices also identify the corresponding global auxiliary variables.
-
-            # Without an explicit global mapping, the supplied children must
-            # represent the complete auxiliary space in consecutive order.
-            dim_auxiliary == master.dim_t || throw(DimensionMismatch(
-                "SeparableOracle: supplied sub-oracles represent $dim_auxiliary auxiliary " *
-                "variables, but master.dim_t is $(master.dim_t). For a partitioned " *
-                "SeparableOracle, provide the corresponding global auxiliary_indices.",
+            all(group -> length(group) == 1, subproblem_groups) || throw(ArgumentError(
+                "SeparableOracle: when auxiliary_indices is omitted, each component " *
+                "oracle must represent exactly one subproblem.",
             ))
-            mappings = Vector{Vector{Int}}()
-            next_index = 1
-            for dimension in child_dimensions
-                push!(mappings, collect(next_index:(next_index + dimension - 1)))
-                next_index += dimension
-            end
+
+            all(==(1), auxiliary_dimensions) || throw(DimensionMismatch(
+                "SeparableOracle: when auxiliary_indices is omitted, each component " *
+                "oracle must represent exactly one auxiliary variable; got auxiliary " *
+                "dimensions $(auxiliary_dimensions).",
+            ))
+
+            all(<=(master.dim_t), flat_subproblem_indices) || throw(ArgumentError(
+                "SeparableOracle: when auxiliary_indices is omitted, subproblem " *
+                "indices also identify global auxiliary variables and must lie " *
+                "within 1:$(master.dim_t); received $(flat_subproblem_indices).",
+            ))
+
+            mappings = [copy(group) for group in subproblem_groups]
         else
             length(auxiliary_indices) == n_local || throw(DimensionMismatch(
                 "SeparableOracle: number of auxiliary-index mappings " *
@@ -316,7 +321,7 @@ function SeparableOracle(
                 data,
                 master;
                 model = model,
-                scen_idx = j,
+                subproblem_idx = j,
                 param = deepcopy(sub_oracle_param),
                 optimizer = optimizer,
             )
@@ -460,8 +465,8 @@ function generate_cuts(oracle::SeparableOracle, x_value::Vector{Float64}, t_valu
         throw(first(failures).exception)
     end
 
-    cuts = reduce(vcat, hyperplanes; init = Hyperplane[])
-    values = reduce(vcat, sub_obj_vals; init = Float64[])
+    cuts = vcat(hyperplanes...)
+    values = vcat(sub_obj_vals...)
     is_in_L = all(local_is_in_L)
 
     if is_in_L

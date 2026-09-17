@@ -11,15 +11,15 @@ function update_master_model!(model::Model, data::SCFLPData)
     return (x = x, ), t
 end
 
-function update_sub_model!(model::Model, data::SCFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::SCFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)
     # Set objective
-    cost_demands = data.costs .* data.demands[scen_idx]'
+    cost_demands = data.costs .* data.demands[subproblem_idx]'
     @objective(model, Min, sum(cost_demands .* y))
     # Add constraints
     @constraint(model, demand[j in 1:J], sum(y[:,j]) == 1)
     @constraint(model, facility_open, y .<= x)
-    @constraint(model, capacity[i in 1:I], sum(data.demands[scen_idx][:] .* y[i,:]) <= data.capacities[i] * x[i])
+    @constraint(model, capacity[i in 1:I], sum(data.demands[subproblem_idx][:] .* y[i,:]) <= data.capacities[i] * x[i])
     return nothing
 end

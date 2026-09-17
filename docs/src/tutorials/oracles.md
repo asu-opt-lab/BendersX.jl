@@ -108,9 +108,8 @@ split_oracles = [
         typical_pair = ntuple(2) do _
             SeparableOracle(
                 master,
-                [ClassicalOracle(data, master; scen_idx = j)];
-                indices = [j],
-                auxiliary_indices = [[j]],
+                [ClassicalOracle(data, master; subproblem_idx = j)];
+                subproblem_indices = [j],
             )
         end
         SplitOracle(
@@ -130,7 +129,7 @@ Each component declares the number of represented `t` values through
 coordinates of the global `t` and embeds each returned cut into the master
 auxiliary space. The ordered `auxiliary_indices` mapping need not be
 contiguous. Contained `SeparableOracle`s and `SplitOracle`s already receive the
-global `t` and return global cuts. Their grouped `indices`, such as
+global `t` and return global cuts. Their grouped `subproblem_indices`, such as
 `[[1, 2], [3, 4]]`, record which subproblems belong to each component.
 
 ### SUFLP with customer-disaggregated scenario blocks
@@ -148,6 +147,11 @@ oracle = SeparableOracle(
     master,
     UFLKnapsackOracle,
     data.n_scenarios;
+    auxiliary_indices = [
+        collect(((subproblem_idx - 1) * data.n_customers + 1):
+                (subproblem_idx * data.n_customers))
+        for subproblem_idx in 1:data.n_scenarios
+    ],
     sub_oracle_param = UFLKnapsackOracleParam(
         add_only_violated_cuts = true,
     ),

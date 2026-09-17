@@ -14,7 +14,7 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
     instances = setdiff(1:71, [67])
 
     # GBC-enabled subproblem customization (y[i,j] <= x[i] via GBC)
-    function update_sub_gbc_model!(model::Model, data::UFLPData, scen_idx::Int; x)
+    function update_sub_gbc_model!(model::Model, data::UFLPData, subproblem_idx::Int; x)
         optimizer = optimizer_with_attributes(CPLEX.Optimizer, "CPXPARAM_Threads" => 7, "CPX_PARAM_EPRHS" => 1e-9, "CPX_PARAM_EPOPT" => 1e-9, "CPX_PARAM_NUMERICALEMPHASIS" => 1, MOI.Silent() => true)
         set_optimizer(model, optimizer)
         I, J = data.n_facilities, data.n_customers

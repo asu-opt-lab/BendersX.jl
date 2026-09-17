@@ -284,7 +284,7 @@ If the configured normalization requires fallback separation, or if disjunctive 
 
 - `oracle::SplitOracle`: Split-based disjunctive oracle.
 - `x_value`: Candidate values of the master variables `x`.
-- `t_value`: Candidate values of the auxiliary variables `t`.
+- `t_value`: Candidate values of the master's complete global auxiliary vector  `t`.
 - `tol_normalize`: Normalization factor for compatibility with the typical-oracle interface.
 - `time_limit`: Maximum time allowed for cut generation, in seconds.
 """
@@ -296,6 +296,12 @@ function generate_cuts(
     time_limit::Float64 = 3600.0
 )
     tic = time()
+
+    dim_global_auxiliary = length(oracle.dcglp[:st])
+    length(t_value) == dim_global_auxiliary || throw(DimensionMismatch(
+        "SplitOracle received t_value with length $(length(t_value)); " *
+        "expected the full global auxiliary dimension $dim_global_auxiliary.",
+    ))
 
     !is_applicable(oracle.normalization, oracle, x_value, t_value) &&
         return generate_cuts(oracle.typical_oracles[1], x_value, t_value; time_limit = max(time_limit - (time() - tic), 0.0))

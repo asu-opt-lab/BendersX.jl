@@ -51,7 +51,7 @@ mutable struct UFLKnapsackOracle <: AbstractTypicalOracle
     obj_values::Vector{Float64}
 
     function UFLKnapsackOracle(data::UFLPData; 
-        scen_idx::Int=-1, 
+        subproblem_idx::Int=-1,
         param::UFLKnapsackOracleParam = UFLKnapsackOracleParam())
             @debug "Building knapsack oracle for UFLP"
             

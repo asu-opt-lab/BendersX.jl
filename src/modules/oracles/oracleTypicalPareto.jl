@@ -89,11 +89,11 @@ where:
 ```julia
 ParetoOracle(data, master::Master, param::ParetoOracleParam;
              model = update_sub_model!,
-             scen_idx::Int = 0)
+             subproblem_idx::Int = 0)
 
 ParetoOracle(data, master::Master;
             model = update_sub_model!,
-            scen_idx::Int = 0,
+            subproblem_idx::Int = 0,
             param::ParetoOracleParam)
 ```
 The second constructor is for `SeparableOracle`. `ParetoOracleParam` should be provided as `sub_oracle_param` in `SeparableOracle`.
@@ -130,7 +130,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
 
     function ParetoOracle(data, master::Master, param::ParetoOracleParam;
                          model = update_sub_model!,
-                         scen_idx::Int = 0,
+                         subproblem_idx::Int = 0,
                          optimizer = DEFAULT_OPTIMIZER)
 
         @debug "Building Pareto oracle"
@@ -150,7 +150,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         end
 
         # Build the submodel using user-defined model update
-        model(sub_model, data, scen_idx; x_copy...)
+        model(sub_model, data, subproblem_idx; x_copy...)
 
         # Validate that the subproblem is LP-compatible for typical oracles
         _validate_lp_compatibility(sub_model)
@@ -166,7 +166,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         pareto_x = var_from_tuple(pareto_x_copy)
 
         # Build pareto model structure
-        model(pareto_model, data, scen_idx; pareto_x_copy...)
+        model(pareto_model, data, subproblem_idx; pareto_x_copy...)
 
         # Apply Magnanti-Wong transformations (add σ, etc.)
         _apply_pareto_transformations!(pareto_model, pareto_x)
@@ -181,10 +181,10 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
     end
     function ParetoOracle(data, master::Master;
                           model = update_sub_model!,
-                          scen_idx::Int = 0,
+                          subproblem_idx::Int = 0,
         param::ParetoOracleParam,
         optimizer = DEFAULT_OPTIMIZER)
-        return ParetoOracle(data, master, param; model = model, scen_idx = scen_idx, optimizer = optimizer)
+        return ParetoOracle(data, master, param; model = model, subproblem_idx = subproblem_idx, optimizer = optimizer)
     end
 end
 

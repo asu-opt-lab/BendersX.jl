@@ -20,13 +20,13 @@ function build_local_split_oracle(
     typical_pair = ntuple(2) do _
         child = UFLKnapsackOracle(
             data;
-            scen_idx = scenario,
+            subproblem_idx = scenario,
             param = deepcopy(oracle_param),
         )
         SeparableOracle(
             master,
             [child];
-            indices = [scenario],
+            subproblem_indices = [scenario],
             auxiliary_indices = [collect(block)],
         )
     end
@@ -123,7 +123,15 @@ end
                         )
                         for scenario in 1:data.n_scenarios
                     ]
-                    oracle = SeparableOracle(master, split_oracles)
+                    oracle = SeparableOracle(
+                        master,
+                        split_oracles;
+                        auxiliary_indices = [
+                            collect(((subproblem_idx - 1) * data.n_customers + 1):
+                                    (subproblem_idx * data.n_customers))
+                            for subproblem_idx in 1:data.n_scenarios
+                        ],
+                    )
                     env = BendersSeq(master, oracle; param = benders_param)
 
                     @info(

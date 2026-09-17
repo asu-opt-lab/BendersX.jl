@@ -10,16 +10,16 @@ function update_master_model!(model::Model, data::SNIPData)
     return (x = x, ), t
 end
 
-function update_sub_model!(model::Model, data::SNIPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::SNIPData, subproblem_idx::Int; x)
     @variable(model, y[1:data.num_nodes] >= 0)
     
-    @objective(model, Min, y[data.scenarios[scen_idx][1]])
+    @objective(model, Min, y[data.scenarios[subproblem_idx][1]])
     
-    @constraint(model, y[data.scenarios[scen_idx][2]] == 1)
+    @constraint(model, y[data.scenarios[subproblem_idx][2]] == 1)
 
     for (idx, (from, to, r, q)) in enumerate(data.D)
         @constraint(model, y[from] - q * y[to] >= 0)
-        @constraint(model, y[from] - r * y[to] >= -(r - q) * data.ψ[scen_idx][to] * x[idx])
+        @constraint(model, y[from] - r * y[to] >= -(r - q) * data.ψ[subproblem_idx][to] * x[idx])
     end
 
     for (from, to, r) in data.A_minus_D
