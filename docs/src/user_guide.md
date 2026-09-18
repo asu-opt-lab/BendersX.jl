@@ -19,6 +19,53 @@ In BendersX.jl, the Master is:
 - owns a JuMP model defining the master problem, and
 - accepts newly generated Benders cuts during the solution process.
 
+#### Two kinds of master customization
+
+Supplying a new `update_master_model!` method changes the mathematical master formulation while retaining the package-provided `Master` implementation. This is the appropriate extension point for most new problem classes.
+
+Defining a new subtype of `AbstractMaster` changes the implementation or master-side behavior itself. For example, a custom subtype may store its objects under different field names or override how generated cuts are added. These two extension mechanisms are independent.
+
+### Adding a New Master
+
+Built-in environments currently support JuMP-backed `AbstractMaster` implementations. A custom implementation provides the following public interface instead of reproducing the fields of `Master`:
+
+```julia
+using BendersX
+using JuMP
+using LinearAlgebra
+
+struct MyMaster <: AbstractMaster
+    jump_model::JuMP.Model
+    linking_structure::NamedTuple
+    linking_vars::Vector{JuMP.VariableRef}
+    auxiliary_vars::Vector{JuMP.VariableRef}
+    linking_costs::Vector{Float64}
+    auxiliary_costs::Vector{Float64}
+end
+
+BendersX.master_model(master::MyMaster) = master.jump_model
+BendersX.linking_variables(master::MyMaster) = master.linking_vars
+BendersX.auxiliary_variables(master::MyMaster) = master.auxiliary_vars
+
+BendersX.copy_linking_variables!(model::JuMP.Model, master::MyMaster) =
+    BendersX.copy_variables!(model, master.linking_structure)
+
+BendersX.evaluate_primal_objective(master::MyMaster, linking_vars, auxiliary_vars) =
+    LinearAlgebra.dot(master.linking_costs, linking_vars) +
+    LinearAlgebra.dot(master.auxiliary_costs, auxiliary_vars)
+```
+
+The order returned by `linking_variables` must match candidate linking-value vectors and the `a_x` coefficients of `Hyperplane`. Likewise, the order returned by `auxiliary_variables` must match candidate auxiliary-value vectors, oracle objective-value vectors, and `a_t`. Flattening the `NamedTuple` returned by
+`copy_linking_variables!` must reproduce the same linking-variable order.
+
+`add_cuts!` has a default implementation based on these methods. A custom master may override it to record or manage ordinary Benders cuts. This hook does not implement a cut-retention policy by itself.
+
+Some components require additional capabilities from the underlying JuMP model:
+
+- `SplitOracle` can transfer only the supported linear master constraints into its DCGLP.
+- `LPRelaxationPreprocessing` requires master integrality constraints that JuMP can temporarily relax.
+- `BendersBnB` requires an optimizer supporting the configured lazy-constraint and user-cut callbacks.
+
 ### Oracle
 An **Oracle** encapsulates all procedures related to **cut generation** at a given separation point.
 

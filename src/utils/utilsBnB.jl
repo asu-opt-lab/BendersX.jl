@@ -185,7 +185,8 @@ If the master optimizer has not been called, the objective and bound fields are 
 See also: [`BendersBnB`](@ref)
 """
 function to_dataframe(env::AbstractBendersBnB, log::BendersBnBLog)
-    if termination_status(env.master.model) == MOI.OPTIMIZE_NOT_CALLED
+    model = master_model(env.master)
+    if termination_status(model) == MOI.OPTIMIZE_NOT_CALLED
         return DataFrame(
             node_count = 0,
             preprocessing_time = log.preprocessing_time,
@@ -198,12 +199,12 @@ function to_dataframe(env::AbstractBendersBnB, log::BendersBnBLog)
         )
     else
         return DataFrame(
-            node_count = JuMP.node_count(env.master.model),
+            node_count = JuMP.node_count(model),
             preprocessing_time = log.preprocessing_time,
             time = log.total_time,
-            obj_bound = JuMP.objective_bound(env.master.model),
+            obj_bound = JuMP.objective_bound(model),
             obj_val = env.obj_value,
-            rel_gap = has_values(env.master.model) ? JuMP.relative_gap(env.master.model) : Inf,
+            rel_gap = has_values(model) ? JuMP.relative_gap(model) : Inf,
             n_lazy_cuts = log.n_lazy_cuts,
             n_user_cuts = log.n_user_cuts
         )

@@ -1,10 +1,10 @@
 """
-    infeasibility_report(master::AbstractMaster, x_opt, t_opt)
+    infeasibility_report(master::AbstractMaster, linking_values, auxiliary_values)
 
 Generate and display an infeasibility/consistency check for a candidate solution
 to a master model.
 
-This function takes a proposed solution `(x_opt, t_opt)` for the master problem,
+This function takes proposed linking and auxiliary values for the master problem,
 loads it into the JuMP model, and evaluates:
 
   * primal feasibility of all constraints,
@@ -16,25 +16,22 @@ whether the candidate solution is feasible for the master problem.
 
 # Arguments
 - `master::AbstractMaster`
-  A container describing the master problem. It must provide:
-  - `master.model` — the underlying JuMP model,
-  - `master.x` — a collection of `VariableRef`s for the master x-variables,
-  - `master.t` — a collection of `VariableRef`s for the t-variables,
-  - `master.dim_x` — dimension of `x`,
-  - `master.dim_t` — dimension of `t`,
-  - `master.c_x`, `master.c_t` — cost vectors for objective evaluation.
+  A master implementation providing the documented [`AbstractMaster`](@ref)
+  interface.
 
-- `x_opt::AbstractVector{<:Real}`
-  Candidate values for the x-variables.
+- `linking_values::AbstractVector{<:Real}`
+  Candidate values for the linking variables in the order returned by
+  [`linking_variables`](@ref).
 
-- `t_opt::AbstractVector{<:Real}`
-  Candidate values for the t-variables (summed internally to a scalar).
+- `auxiliary_values::AbstractVector{<:Real}`
+  Candidate values for the auxiliary variables in the order returned by
+  [`auxiliary_variables`](@ref).
 
 # Behavior
 1. Converts the candidate values into a dictionary `opt_sol::Dict{VariableRef,Float64}`.
 2. Prints:
    - a primal feasibility report (`primal_feasibility_report`),
-   - the objective value `cₓᵀ x_opt + cₜᵀ t_opt`.
+   - the objective value returned by [`evaluate_primal_objective`](@ref).
 3. Fixes all master variables to the candidate values and re-solves the model.
 4. Prints the resulting objective value.
 
@@ -49,29 +46,40 @@ The function is used for logging and diagnostic purposes.
 
 # Example
 ```julia
-# Suppose `master` is an AbstractMaster with dim_x = 3, dim_t = 1
-x_opt = [1.0, 0.5, 2.0]
-t_opt = [0.3]
+# Suppose `master` has three linking variables and one auxiliary variable.
+linking_values = [1.0, 0.5, 2.0]
+auxiliary_values = [0.3]
 
-infeasibility_report(master, x_opt, t_opt)
+infeasibility_report(master, linking_values, auxiliary_values)
 """
-function infeasibility_report(master::AbstractMaster, x_opt, t_opt)
-    t_opt_ = [sum(t_opt)]
+function infeasibility_report(master::AbstractMaster, linking_values, auxiliary_values)
+    model = master_model(master)
+    linking_vars = linking_variables(master)
+    auxiliary_vars = auxiliary_variables(master)
+
+    length(linking_values) == length(linking_vars) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(linking_vars)) linking values, " *
+        "got $(length(linking_values)).",
+    ))
+    length(auxiliary_values) == length(auxiliary_vars) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(auxiliary_vars)) auxiliary values, " *
+        "got $(length(auxiliary_values)).",
+    ))
 
     opt_sol = Dict{VariableRef, Float64}()
-    for i = 1:master.dim_x
-        opt_sol[master.x[i]] = x_opt[i]
+    for i in eachindex(linking_vars)
+        opt_sol[linking_vars[i]] = linking_values[i]
     end
-    for i = 1:master.dim_t
-        opt_sol[master.t[i]] = t_opt_[i]
+    for i in eachindex(auxiliary_vars)
+        opt_sol[auxiliary_vars[i]] = auxiliary_values[i]
     end
 
-    @info primal_feasibility_report(master.model, opt_sol)
-    @info master.c_x' * x_opt + master.c_t' * t_opt_
+    @info primal_feasibility_report(model, opt_sol)
+    @info evaluate_primal_objective(master, linking_values, auxiliary_values)
 
     for v in keys(opt_sol)
         fix(v, opt_sol[v]; force=true)
     end
-    optimize!(master.model)
-    @info objective_value(master.model)
+    optimize!(model)
+    @info objective_value(model)
 end

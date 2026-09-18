@@ -63,3 +63,27 @@ mutable struct Master <: AbstractMaster
         new(jump_model, x_tuple, x, t, dim_x, dim_t, c_x, c_t)
     end
 end
+
+# The provided Master keeps its existing fields for backward compatibility,
+# while framework code accesses them only through the documented interface.
+master_model(master::Master) = master.model
+linking_variables(master::Master) = master.x
+auxiliary_variables(master::Master) = master.t
+copy_linking_variables!(model::Model, master::Master) =
+    copy_variables!(model, master.x_tuple)
+
+function evaluate_primal_objective(
+    master::Master,
+    linking_vars::AbstractVector{<:Real},
+    auxiliary_vars::AbstractVector{<:Real},
+)
+    length(linking_vars) == length(master.c_x) || throw(DimensionMismatch(
+        "evaluate_primal_objective: expected $(length(master.c_x)) linking " *
+        "values, got $(length(linking_vars)).",
+    ))
+    length(auxiliary_vars) == length(master.c_t) || throw(DimensionMismatch(
+        "evaluate_primal_objective: expected $(length(master.c_t)) auxiliary " *
+        "values, got $(length(auxiliary_vars)).",
+    ))
+    return dot(master.c_x, linking_vars) + dot(master.c_t, auxiliary_vars)
+end

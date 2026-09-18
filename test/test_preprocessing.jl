@@ -5,8 +5,10 @@ struct PreprocessingTestOracle <: BendersX.AbstractOracle end
 struct PreprocessingTestDisjunctiveOracle <: BendersX.AbstractDisjunctiveOracle end
 
 struct PreprocessingTestMaster <: BendersX.AbstractMaster
-    model::Model
+    jump_model::Model
 end
+
+BendersX.master_model(master::PreprocessingTestMaster) = master.jump_model
 
 struct PreprocessingProbeException <: Exception end
 struct ThrowingPreprocessing <: BendersX.AbstractPreprocessing end
@@ -30,7 +32,7 @@ const preprocessing_seq_calls = Any[]
 const throw_during_preprocessing = Ref(false)
 
 function BendersX.solve!(env::PreprocessingRecordingSeq)
-    variable = only(all_variables(env.master.model))
+    variable = only(all_variables(BendersX.master_model(env.master)))
     push!(preprocessing_seq_calls, (
         oracle = env.oracle,
         param = env.param,
