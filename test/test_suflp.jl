@@ -181,7 +181,7 @@ end
             [0.0, 0.0, 0.0, -1.0],
         ]
 
-        split_children = [
+        split_oracles = [
             begin
                 block_start = (scenario - 1) * data.n_customers + 1
                 block = block_start:(block_start + data.n_customers - 1)
@@ -203,7 +203,7 @@ end
         ]
         split_oracle = SeparableOracle(
             master,
-            split_children;
+            split_oracles;
             auxiliary_indices = [
                 collect(((subproblem_idx - 1) * data.n_customers + 1):
                         (subproblem_idx * data.n_customers))
@@ -212,9 +212,12 @@ end
         )
         @test split_oracle.dim_auxiliary == 4
         @test split_oracle.auxiliary_indices == [[1, 2], [3, 4]]
-        @test BendersX.auxiliary_dimension.(split_children) == [2, 2]
-        @test all(length(child.dcglp[:st]) == master.dim_t for child in split_children)
-        @test getfield.(split_children, :auxiliary_indices) == [[1, 2], [3, 4]]
+        @test BendersX.auxiliary_dimension.(split_oracles) == [2, 2]
+        @test all(
+            length(component_oracle.dcglp[:st]) == master.dim_t
+            for component_oracle in split_oracles
+        )
+        @test getfield.(split_oracles, :auxiliary_indices) == [[1, 2], [3, 4]]
     end
 
     @testset "Benders formulations match the extensive form" begin

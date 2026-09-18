@@ -64,7 +64,7 @@ function classical_separable_component(
     master,
     subproblem_indices::Vector{Int},
 )
-    children = [
+    component_oracles = [
         ClassicalOracle(
             data,
             master;
@@ -75,7 +75,7 @@ function classical_separable_component(
     ]
     return SeparableOracle(
         master,
-        children;
+        component_oracles;
         subproblem_indices = subproblem_indices,
         auxiliary_indices = [[subproblem_idx] for subproblem_idx in subproblem_indices],
     )
@@ -215,15 +215,15 @@ function grouped_split_oracle(data, master, subproblem_indices::Vector{Int})
 end
 
 @testset "SeparableOracle composition" begin
-    @testset "accepts disjunctive children and embeds copies" begin
+    @testset "accepts disjunctive component oracles and embeds cuts" begin
         _, master = separable_oracle_fixture()
         first_cut = BendersX.Hyperplane([1.0, 0.0], [-2.0], 3.0)
         second_cut = BendersX.Hyperplane([0.0, 1.0], [-4.0], 5.0)
-        children = [
+        component_oracles = [
             StoredLocalDisjunctiveOracle(first_cut, 11.0),
             StoredLocalDisjunctiveOracle(second_cut, 13.0),
         ]
-        oracle = SeparableOracle(master, children)
+        oracle = SeparableOracle(master, component_oracles)
 
         @test oracle.subproblem_indices == [[1], [2]]
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -263,7 +263,26 @@ end
         @test collect(cuts[2].a_t) == [0.0, -1.0]
     end
 
-    @testset "supports multi-dimensional child auxiliary blocks" begin
+    @testset "homogeneous constructor supports a subset of subproblems" begin
+        data, master = separable_oracle_fixture(10)
+        oracle = SeparableOracle(
+            data,
+            master,
+            HomogeneousDisjunctiveOracle,
+            3;
+            subproblem_indices = [2, 5, 10],
+            auxiliary_indices = [[2], [5], [10]],
+            optimizer = nothing,
+        )
+
+        @test getfield.(oracle.oracles, :subproblem_idx) == [2, 5, 10]
+        @test oracle.subproblem_indices == [[2], [5], [10]]
+        @test oracle.auxiliary_indices == [[2], [5], [10]]
+        @test oracle.dim_auxiliary == 3
+        @test oracle.dim_global_auxiliary == 10
+    end
+
+    @testset "supports multi-dimensional auxiliary blocks for component oracles" begin
         data = UFLPData(
             2,
             2,
@@ -305,23 +324,23 @@ end
 
     @testset "infers auxiliary indices from subproblem indices" begin
         _, master = separable_oracle_fixture(10)
-        selected_indices = [2, 3, 10]
-        children = [
+        selected_subproblem_indices = [2, 3, 10]
+        component_oracles = [
             StoredLocalTypicalOracle(
                 1,
                 BendersX.Hyperplane(
                     [1.0, 0.0],
-                    [-Float64(index)],
+                    [-Float64(subproblem_idx)],
                     4.0,
                 ),
-                [100.0 + index],
+                [100.0 + subproblem_idx],
                 Vector{Float64}[],
-            ) for index in selected_indices
+            ) for subproblem_idx in selected_subproblem_indices
         ]
         oracle = SeparableOracle(
             master,
-            children;
-            subproblem_indices = selected_indices,
+            component_oracles;
+            subproblem_indices = selected_subproblem_indices,
         )
 
         is_in_L, cuts, objectives = BendersX.generate_cuts(
@@ -330,7 +349,11 @@ end
             collect(1.0:10.0),
         )
         @test !is_in_L
-        @test getfield.(children, :received_t) == [[[2.0]], [[3.0]], [[10.0]]]
+        @test getfield.(component_oracles, :received_t) == [
+            [[2.0]],
+            [[3.0]],
+            [[10.0]],
+        ]
         @test objectives == [102.0, 103.0, 110.0]
         @test findnz.(getfield.(cuts, :a_t)) == [
             ([2], [-2.0]),
@@ -345,7 +368,7 @@ end
 
     @testset "supports noncontiguous auxiliary indices for one component" begin
         _, master = separable_oracle_fixture(10)
-        child = StoredLocalTypicalOracle(
+        component_oracle = StoredLocalTypicalOracle(
             3,
             BendersX.Hyperplane(
                 [1.0, 0.0],
@@ -357,7 +380,7 @@ end
         )
         oracle = SeparableOracle(
             master,
-            [child];
+            [component_oracle];
             subproblem_indices = [[8, 2, 5]],
             auxiliary_indices = [[8, 2, 5]],
         )
@@ -369,7 +392,7 @@ end
         )
 
         @test !is_in_L
-        @test child.received_t == [[8.0, 2.0, 5.0]]
+        @test component_oracle.received_t == [[8.0, 2.0, 5.0]]
         @test objectives == [108.0, 102.0, 105.0]
         @test findnz(cuts[1].a_t) == ([2, 5, 8], [-2.0, -5.0, -8.0])
         @test oracle.auxiliary_indices == [[8, 2, 5]]
@@ -474,7 +497,7 @@ end
         )
     end
 
-    @testset "validates child and global output dimensions" begin
+    @testset "validates component and global output dimensions" begin
         _, master = separable_oracle_fixture()
         valid = SeparableContractOracle(2, 1, 1, true)
         oracle = SeparableOracle(master, [valid, valid])
@@ -513,13 +536,13 @@ end
         )
     end
 
-    @testset "subset SplitOracles reuse global cut history" begin
+    @testset "SeparableOracle composes scenario-specific SplitOracles" begin
         data, master = separable_oracle_fixture()
-        split_children = [local_split_oracle(data, master, j) for j in 1:2]
-        oracle = SeparableOracle(master, split_children)
+        split_oracles = [local_split_oracle(data, master, j) for j in 1:2]
+        oracle = SeparableOracle(master, split_oracles)
 
-        @test getfield.(split_children, :auxiliary_indices) == [[1], [2]]
-        @test length.(getindex.(getfield.(split_children, :dcglp), Ref(:st))) == [2, 2]
+        @test getfield.(split_oracles, :auxiliary_indices) == [[1], [2]]
+        @test length.(getindex.(getfield.(split_oracles, :dcglp), Ref(:st))) == [2, 2]
         for _ in 1:2
             is_in_L, cuts, objectives = BendersX.generate_cuts(
                 oracle,
@@ -532,7 +555,7 @@ end
             @test length(objectives) == 2
             @test all(
                 length(cut.a_t) == master.dim_t
-                for child in split_children for cut in child.disjunctive_cuts
+                for split_oracle in split_oracles for cut in split_oracle.disjunctive_cuts
             )
         end
     end
@@ -561,6 +584,10 @@ end
         @test all(
             length(cut.a_t) == master.dim_t for cut in cuts
         )
+        nonzero_auxiliary_indices = sort(unique(vcat([
+            findnz(cut.a_t)[1] for cut in cuts
+        ]...)))
+        @test nonzero_auxiliary_indices == [2, 4]
         @test all(
             length(cut.a_t) == master.dim_t for cut in split.disjunctive_cuts
         )
@@ -669,6 +696,10 @@ end
         @test is_in_L isa Bool
         @test length(objectives) == 4
         @test all(length(cut.a_t) == 4 for cut in cuts)
+        nonzero_auxiliary_indices = sort(unique(vcat([
+            findnz(cut.a_t)[1] for cut in cuts
+        ]...)))
+        @test nonzero_auxiliary_indices == collect(1:4)
 
         @test_throws ArgumentError SeparableOracle(
             master,
@@ -706,7 +737,6 @@ end
             ),
         )
 
-        @test split.dim_auxiliary == 1
         @test BendersX.auxiliary_dimension(split) == 1
         @test length(split.dcglp[:st]) == master.dim_t
         @test split.auxiliary_indices == [1]
@@ -729,7 +759,7 @@ end
     @testset "global SplitOracle still accepts separable typical components" begin
         data, master = separable_oracle_fixture()
         separable_pair = ntuple(2) do _
-            children = [
+            component_oracles = [
                 ClassicalOracle(
                     data,
                     master;
@@ -738,7 +768,7 @@ end
                     optimizer = separable_oracle_optimizer(),
                 ) for j in 1:2
             ]
-            SeparableOracle(master, children)
+            SeparableOracle(master, component_oracles)
         end
         split = SplitOracle(
             master,
