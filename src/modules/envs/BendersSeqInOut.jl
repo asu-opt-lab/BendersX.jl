@@ -99,8 +99,8 @@ function solve!(env::BendersSeqInOut)
         # Apply preprocessing
         log.preprocessing_time = preprocess!(env.master, env.preprocessing; time_limit = get_sec_remaining(log, param))
         model = master_model(env.master)
-        x_variables = linking_variables(env.master)
-        t_variables = auxiliary_variables(env.master)
+        linking_vars = linking_variables(env.master)
+        auxiliary_vars = auxiliary_variables(env.master)
 
         stabilizing_x = param.stabilizing_x
         α = param.α
@@ -118,8 +118,8 @@ function solve!(env::BendersSeqInOut)
                     optimize!(model)
                     if is_solved_and_feasible(model; allow_local = false, dual = false)
                         state.LB = JuMP.objective_value(model)
-                        state.values[:x] = JuMP.value.(x_variables)
-                        state.values[:t] = JuMP.value.(t_variables)
+                        state.values[:x] = JuMP.value.(linking_vars)
+                        state.values[:t] = JuMP.value.(auxiliary_vars)
                     elseif termination_status(model) == TIME_LIMIT
                         throw(TimeLimitException("BendersSeqInOut: Time limit reached during master solving"))
                     else
@@ -140,7 +140,12 @@ function solve!(env::BendersSeqInOut)
                             update_upper_bound_and_gap!(
                                 state,
                                 log,
-                                (f_x, x) -> evaluate_primal_objective(env.master, x, f_x),
+                                (auxiliary_values, linking_values) ->
+                                    evaluate_primal_objective(
+                                        env.master,
+                                        linking_values,
+                                        auxiliary_values,
+                                    ),
                             )
                         end
                     else

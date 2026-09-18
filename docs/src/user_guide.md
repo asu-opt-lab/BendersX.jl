@@ -37,25 +37,25 @@ using LinearAlgebra
 struct MyMaster <: AbstractMaster
     jump_model::JuMP.Model
     linking_structure::NamedTuple
-    first_stage_variables::Vector{JuMP.VariableRef}
-    recourse_variables::Vector{JuMP.VariableRef}
-    first_stage_costs::Vector{Float64}
-    recourse_costs::Vector{Float64}
+    linking_vars::Vector{JuMP.VariableRef}
+    auxiliary_vars::Vector{JuMP.VariableRef}
+    linking_costs::Vector{Float64}
+    auxiliary_costs::Vector{Float64}
 end
 
 BendersX.master_model(master::MyMaster) = master.jump_model
-BendersX.linking_variables(master::MyMaster) = master.first_stage_variables
-BendersX.auxiliary_variables(master::MyMaster) = master.recourse_variables
+BendersX.linking_variables(master::MyMaster) = master.linking_vars
+BendersX.auxiliary_variables(master::MyMaster) = master.auxiliary_vars
 
 BendersX.copy_linking_variables!(model::JuMP.Model, master::MyMaster) =
     BendersX.copy_variables!(model, master.linking_structure)
 
-BendersX.evaluate_primal_objective(master::MyMaster, x, f_x) =
-    LinearAlgebra.dot(master.first_stage_costs, x) +
-    LinearAlgebra.dot(master.recourse_costs, f_x)
+BendersX.evaluate_primal_objective(master::MyMaster, linking_vars, auxiliary_vars) =
+    LinearAlgebra.dot(master.linking_costs, linking_vars) +
+    LinearAlgebra.dot(master.auxiliary_costs, auxiliary_vars)
 ```
 
-The order returned by `linking_variables` must match candidate `x` vectors and the `a_x` coefficients of `Hyperplane`. Likewise, the order returned by `auxiliary_variables` must match candidate `t` vectors, oracle objective-value vectors, and `a_t`. Flattening the `NamedTuple` returned by
+The order returned by `linking_variables` must match candidate linking-value vectors and the `a_x` coefficients of `Hyperplane`. Likewise, the order returned by `auxiliary_variables` must match candidate auxiliary-value vectors, oracle objective-value vectors, and `a_t`. Flattening the `NamedTuple` returned by
 `copy_linking_variables!` must reproduce the same linking-variable order.
 
 `add_cuts!` has a default implementation based on these methods. A custom master may override it to record or manage ordinary Benders cuts. This hook does not implement a cut-retention policy by itself.

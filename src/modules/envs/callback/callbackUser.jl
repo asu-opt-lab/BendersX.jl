@@ -54,8 +54,8 @@ function user_callback(
     callback::UserCallback,
 )
     model = master_model(master)
-    x_variables = linking_variables(master)
-    t_variables = auxiliary_variables(master)
+    linking_vars = linking_variables(master)
+    auxiliary_vars = auxiliary_variables(master)
     status = JuMP.callback_node_status(cb_data, model)
     
     if status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
@@ -77,13 +77,18 @@ function user_callback(
             if process_node
                 # Create state and get current variable values
                 state = BendersBnBState()
-                state.values[:x] = JuMP.callback_value.(cb_data, x_variables)
-                state.values[:t] = JuMP.callback_value.(cb_data, t_variables)
+                state.values[:x] = JuMP.callback_value.(cb_data, linking_vars)
+                state.values[:t] = JuMP.callback_value.(cb_data, auxiliary_vars)
                 
                 # Generate cuts
                 state.oracle_time = @elapsed begin
                     state.is_in_L, hyperplanes, state.f_x = generate_cuts(callback.oracle, state.values[:x], state.values[:t]; time_limit = get_sec_remaining(log, param))
-                    cuts = !state.is_in_L ? hyperplanes_to_expression(model, hyperplanes, x_variables, t_variables) : []
+                    cuts = !state.is_in_L ? hyperplanes_to_expression(
+                        model,
+                        hyperplanes,
+                        linking_vars,
+                        auxiliary_vars,
+                    ) : []
                     state.num_cuts += length(hyperplanes)
                 end
 

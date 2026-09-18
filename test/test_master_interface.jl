@@ -30,26 +30,26 @@ end
 mutable struct RenamedFieldMaster <: BendersX.AbstractMaster
     jump_model::Model
     linking_structure::NamedTuple
-    first_stage_variables::Vector{VariableRef}
-    recourse_variables::Vector{VariableRef}
-    first_stage_costs::Vector{Float64}
-    recourse_costs::Vector{Float64}
+    linking_vars::Vector{VariableRef}
+    auxiliary_vars::Vector{VariableRef}
+    linking_costs::Vector{Float64}
+    auxiliary_costs::Vector{Float64}
     cut_batches::Int
 end
 
 BendersX.master_model(master::RenamedFieldMaster) = master.jump_model
-BendersX.linking_variables(master::RenamedFieldMaster) = master.first_stage_variables
-BendersX.auxiliary_variables(master::RenamedFieldMaster) = master.recourse_variables
+BendersX.linking_variables(master::RenamedFieldMaster) = master.linking_vars
+BendersX.auxiliary_variables(master::RenamedFieldMaster) = master.auxiliary_vars
 BendersX.copy_linking_variables!(model::Model, master::RenamedFieldMaster) =
     BendersX.copy_variables!(model, master.linking_structure)
 
 function BendersX.evaluate_primal_objective(
     master::RenamedFieldMaster,
-    x_value::AbstractVector{<:Real},
-    recourse_value::AbstractVector{<:Real},
+    linking_vars::AbstractVector{<:Real},
+    auxiliary_vars::AbstractVector{<:Real},
 )
-    return dot(master.first_stage_costs, x_value) +
-           dot(master.recourse_costs, recourse_value)
+    return dot(master.linking_costs, linking_vars) +
+           dot(master.auxiliary_costs, auxiliary_vars)
 end
 
 function BendersX.add_cuts!(
@@ -60,8 +60,8 @@ function BendersX.add_cuts!(
     cuts = BendersX.hyperplanes_to_expression(
         master.jump_model,
         hyperplanes,
-        master.first_stage_variables,
-        master.recourse_variables,
+        master.linking_vars,
+        master.auxiliary_vars,
     )
     return @constraint(master.jump_model, 0.0 .>= cuts)
 end
@@ -124,10 +124,10 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         @test fieldnames(RenamedFieldMaster) == (
             :jump_model,
             :linking_structure,
-            :first_stage_variables,
-            :recourse_variables,
-            :first_stage_costs,
-            :recourse_costs,
+            :linking_vars,
+            :auxiliary_vars,
+            :linking_costs,
+            :auxiliary_costs,
             :cut_batches,
         )
         @test keys(copied) == (:open,)
