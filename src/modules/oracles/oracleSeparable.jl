@@ -130,7 +130,8 @@ give the positions in the full master auxiliary space. The same
 sub-oracle.
 
 For a full `SeparableOracle`, the sum of the sub-oracles'
-[`auxiliary_dimension`](@ref) values must equal `master.dim_t`. For a
+[`auxiliary_dimension`](@ref) values must equal the number of master auxiliary
+variables. For a
 partitioned instance, each supplied global auxiliary-index vector must have
 the same length as the corresponding sub-oracle's auxiliary dimension.
 
@@ -159,6 +160,7 @@ mutable struct SeparableOracle <: AbstractOracle
         param::SeparableOracleParam = SeparableOracleParam(),
     )
         n_local = length(oracles)
+        dim_global_auxiliary = length(auxiliary_variables(master))
         n_local > 0 || throw(ArgumentError(
             "SeparableOracle: at least one component oracle is required.",
         ))
@@ -221,10 +223,10 @@ mutable struct SeparableOracle <: AbstractOracle
                 )
             end
 
-            all(<=(master.dim_t), flat_subproblem_indices) || throw(ArgumentError(
+            all(<=(dim_global_auxiliary), flat_subproblem_indices) || throw(ArgumentError(
                 "SeparableOracle: when auxiliary_indices is omitted, subproblem " *
                 "indices also identify global auxiliary variables and must lie " *
-                "within 1:$(master.dim_t); received $(flat_subproblem_indices).",
+                "within 1:$(dim_global_auxiliary); received $(flat_subproblem_indices).",
             ))
 
             mappings = [copy(group) for group in subproblem_groups]
@@ -256,10 +258,10 @@ mutable struct SeparableOracle <: AbstractOracle
                     ),
                 )
 
-                all(1 <= index <= master.dim_t for index in mapping) || throw(
+                all(1 <= index <= dim_global_auxiliary for index in mapping) || throw(
                     ArgumentError(
                         "SeparableOracle: auxiliary_indices for component oracle " *
-                        "$k must lie within 1:$(master.dim_t); received $(mapping).",
+                        "$k must lie within 1:$(dim_global_auxiliary); received $(mapping).",
                     ),
                 )
             end
@@ -276,7 +278,7 @@ mutable struct SeparableOracle <: AbstractOracle
         @info "SeparableOracle: $(n_local) component oracles representing " *
               "$(length(flat_subproblem_indices)) subproblems, " *
               "dim_auxiliary=$(dim_auxiliary), " *
-              "dim_global_auxiliary=$(master.dim_t), " *
+              "dim_global_auxiliary=$(dim_global_auxiliary), " *
               "$(Threads.nthreads()) threads available for parallel execution"
 
         new(
@@ -285,7 +287,7 @@ mutable struct SeparableOracle <: AbstractOracle
             subproblem_groups,
             mappings,
             dim_auxiliary,
-            master.dim_t,
+            dim_global_auxiliary,
         )
     end
 end

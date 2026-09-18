@@ -46,7 +46,11 @@ By default, no preprocessing is applied.
 ```julia
 master = Master(data; model = update_master_model!)
 oracle = ClassicalOracle(data, master; model = update_sub_model!)
-param = BendersSeqInOutParam(α = 0.8, λ = 0.5, stabilizing_x = zeros(master.dim_x))
+param = BendersSeqInOutParam(
+    α = 0.8,
+    λ = 0.5,
+    stabilizing_x = zeros(length(BendersX.linking_variables(master))),
+)
 env = BendersSeqInOut(master, oracle; param = param)
 df = solve!(env)
 ```
@@ -94,6 +98,9 @@ function solve!(env::BendersSeqInOut)
     try    
         # Apply preprocessing
         log.preprocessing_time = preprocess!(env.master, env.preprocessing; time_limit = get_sec_remaining(log, param))
+        model = master_model(env.master)
+        x_variables = linking_variables(env.master)
+        t_variables = auxiliary_variables(env.master)
 
         stabilizing_x = param.stabilizing_x
         α = param.α
@@ -107,16 +114,16 @@ function solve!(env::BendersSeqInOut)
             state.total_time = @elapsed begin
                 # Solve master problem
                 state.master_time = @elapsed begin
-                    set_time_limit_sec(env.master.model, get_sec_remaining(log, param))
-                    optimize!(env.master.model)
-                    if is_solved_and_feasible(env.master.model; allow_local = false, dual = false)
-                        state.LB = JuMP.objective_value(env.master.model)
-                        state.values[:x] = JuMP.value.(env.master.x)
-                        state.values[:t] = JuMP.value.(env.master.t)
-                    elseif termination_status(env.master.model) == TIME_LIMIT
+                    set_time_limit_sec(model, get_sec_remaining(log, param))
+                    optimize!(model)
+                    if is_solved_and_feasible(model; allow_local = false, dual = false)
+                        state.LB = JuMP.objective_value(model)
+                        state.values[:x] = JuMP.value.(x_variables)
+                        state.values[:t] = JuMP.value.(t_variables)
+                    elseif termination_status(model) == TIME_LIMIT
                         throw(TimeLimitException("BendersSeqInOut: Time limit reached during master solving"))
                     else
-                        throw(UnexpectedModelStatusException("BendersSeqInOut: master $(termination_status(env.master.model))"))
+                        throw(UnexpectedModelStatusException("BendersSeqInOut: master $(termination_status(model))"))
                     end
                 end
                 
@@ -130,13 +137,15 @@ function solve!(env::BendersSeqInOut)
 
                     if kelley_mode 
                         if all(isfinite, state.f_x)
-                            update_upper_bound_and_gap!(state, log, (f_x, x) -> env.master.c_t' * f_x + env.master.c_x' * x)
+                            update_upper_bound_and_gap!(
+                                state,
+                                log,
+                                (f_x, x) -> evaluate_primal_objective(env.master, x, f_x),
+                            )
                         end
                     else
                         state.is_in_L = false
                     end
-
-                    cuts = !state.is_in_L ? hyperplanes_to_expression(env.master.model, hyperplanes, env.master.x, env.master.t) : []
                 end
             
                 # Update state and record information
@@ -149,7 +158,7 @@ function solve!(env::BendersSeqInOut)
             is_terminated(state, log, param) && break
 
             # add generated cuts to master
-            @constraint(env.master.model, 0 .>= cuts)
+            !state.is_in_L && add_cuts!(env.master, hyperplanes)
             
             # whether to switch kelley mode
             if !kelley_mode && log.n_iter != 0

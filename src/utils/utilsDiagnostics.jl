@@ -16,25 +16,21 @@ whether the candidate solution is feasible for the master problem.
 
 # Arguments
 - `master::AbstractMaster`
-  A container describing the master problem. It must provide:
-  - `master.model` — the underlying JuMP model,
-  - `master.x` — a collection of `VariableRef`s for the master x-variables,
-  - `master.t` — a collection of `VariableRef`s for the t-variables,
-  - `master.dim_x` — dimension of `x`,
-  - `master.dim_t` — dimension of `t`,
-  - `master.c_x`, `master.c_t` — cost vectors for objective evaluation.
+  A master implementation providing the documented [`AbstractMaster`](@ref)
+  interface.
 
 - `x_opt::AbstractVector{<:Real}`
   Candidate values for the x-variables.
 
 - `t_opt::AbstractVector{<:Real}`
-  Candidate values for the t-variables (summed internally to a scalar).
+  Candidate values for the auxiliary variables in the order returned by
+  [`auxiliary_variables`](@ref).
 
 # Behavior
 1. Converts the candidate values into a dictionary `opt_sol::Dict{VariableRef,Float64}`.
 2. Prints:
    - a primal feasibility report (`primal_feasibility_report`),
-   - the objective value `cₓᵀ x_opt + cₜᵀ t_opt`.
+   - the objective value returned by [`evaluate_primal_objective`](@ref).
 3. Fixes all master variables to the candidate values and re-solves the model.
 4. Prints the resulting objective value.
 
@@ -49,29 +45,40 @@ The function is used for logging and diagnostic purposes.
 
 # Example
 ```julia
-# Suppose `master` is an AbstractMaster with dim_x = 3, dim_t = 1
+# Suppose `master` has three linking variables and one auxiliary variable.
 x_opt = [1.0, 0.5, 2.0]
 t_opt = [0.3]
 
 infeasibility_report(master, x_opt, t_opt)
 """
 function infeasibility_report(master::AbstractMaster, x_opt, t_opt)
-    t_opt_ = [sum(t_opt)]
+    model = master_model(master)
+    x_variables = linking_variables(master)
+    t_variables = auxiliary_variables(master)
+
+    length(x_opt) == length(x_variables) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(x_variables)) linking values, " *
+        "got $(length(x_opt)).",
+    ))
+    length(t_opt) == length(t_variables) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(t_variables)) auxiliary values, " *
+        "got $(length(t_opt)).",
+    ))
 
     opt_sol = Dict{VariableRef, Float64}()
-    for i = 1:master.dim_x
-        opt_sol[master.x[i]] = x_opt[i]
+    for i in eachindex(x_variables)
+        opt_sol[x_variables[i]] = x_opt[i]
     end
-    for i = 1:master.dim_t
-        opt_sol[master.t[i]] = t_opt_[i]
+    for i in eachindex(t_variables)
+        opt_sol[t_variables[i]] = t_opt[i]
     end
 
-    @info primal_feasibility_report(master.model, opt_sol)
-    @info master.c_x' * x_opt + master.c_t' * t_opt_
+    @info primal_feasibility_report(model, opt_sol)
+    @info evaluate_primal_objective(master, x_opt, t_opt)
 
     for v in keys(opt_sol)
         fix(v, opt_sol[v]; force=true)
     end
-    optimize!(master.model)
-    @info objective_value(master.model)
+    optimize!(model)
+    @info objective_value(model)
 end

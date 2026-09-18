@@ -77,7 +77,7 @@ We denote \$-d^{\\top}y + w_0\\sigma \\geq -\\eta^*\$ as an objective bound cons
 
 # Constructor
 ```julia
-UnifiedOracle(data, master::Master;
+UnifiedOracle(data, master::AbstractMaster;
               model = update_sub_model!,
               subproblem_idx::Int = 0,
               param::UnifiedOracleParam = UnifiedOracleParam())
@@ -114,7 +114,7 @@ mutable struct UnifiedOracle <: AbstractTypicalOracle
     fixing_ub_constraints::Vector{ConstraintRef}
     objective_constraint::ConstraintRef
 
-    function UnifiedOracle(data, master::Master;
+    function UnifiedOracle(data, master::AbstractMaster;
                           model = update_sub_model!,
                           subproblem_idx::Int = 0,
                           param::UnifiedOracleParam = UnifiedOracleParam(),
@@ -125,7 +125,7 @@ mutable struct UnifiedOracle <: AbstractTypicalOracle
         set_optimizer_checked!(sub_model, optimizer, "UnifiedOracle subproblem model")
 
         # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-        x_copy = copy_variables!(sub_model, master.x_tuple)
+        x_copy = copy_linking_variables!(sub_model, master)
 
         # Collect all copied master variables
         x = var_from_tuple(x_copy)

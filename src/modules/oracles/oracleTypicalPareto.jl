@@ -87,11 +87,11 @@ where:
 
 # Constructors
 ```julia
-ParetoOracle(data, master::Master, param::ParetoOracleParam;
+ParetoOracle(data, master::AbstractMaster, param::ParetoOracleParam;
              model = update_sub_model!,
              subproblem_idx::Int = 0)
 
-ParetoOracle(data, master::Master;
+ParetoOracle(data, master::AbstractMaster;
             model = update_sub_model!,
             subproblem_idx::Int = 0,
             param::ParetoOracleParam)
@@ -128,7 +128,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
     # Magnanti-Wong pareto model
     pareto_model::Model
 
-    function ParetoOracle(data, master::Master, param::ParetoOracleParam;
+    function ParetoOracle(data, master::AbstractMaster, param::ParetoOracleParam;
                          model = update_sub_model!,
                          subproblem_idx::Int = 0,
                          optimizer = DEFAULT_OPTIMIZER)
@@ -138,7 +138,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         set_optimizer_checked!(sub_model, optimizer, "ParetoOracle standard subproblem model")
 
         # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-        x_copy = copy_variables!(sub_model, master.x_tuple)
+        x_copy = copy_linking_variables!(sub_model, master)
 
         # Collect all copied master variables
         x = var_from_tuple(x_copy)
@@ -162,7 +162,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         set_optimizer_checked!(pareto_model, optimizer, "ParetoOracle pareto subproblem model")
 
         # Copy master variables for pareto model
-        pareto_x_copy = copy_variables!(pareto_model, master.x_tuple)
+        pareto_x_copy = copy_linking_variables!(pareto_model, master)
         pareto_x = var_from_tuple(pareto_x_copy)
 
         # Build pareto model structure
@@ -179,7 +179,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
 
         new(param, sub_model, fix_x, pareto_model)
     end
-    function ParetoOracle(data, master::Master;
+    function ParetoOracle(data, master::AbstractMaster;
                           model = update_sub_model!,
                           subproblem_idx::Int = 0,
         param::ParetoOracleParam,

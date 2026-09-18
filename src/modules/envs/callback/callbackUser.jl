@@ -36,7 +36,7 @@ struct UserCallback <: AbstractUserCallback
 end
 
 """
-    user_callback(cb_data, master::Master, log::BendersBnBLog, callback::UserCallback)
+    user_callback(cb_data, master::AbstractMaster, log::BendersBnBLog, callback::UserCallback)
 
 Generate and submit Benders user cuts at selected fractional branch-and-bound nodes.
 
@@ -46,8 +46,17 @@ The callback first applies the configured frequency, node-count, and depth filte
 Solver-specific callback metadata, such as node counts and depths, is obtained through [`callback_node_count`](@ref) and [`callback_node_depth`](@ref), respectively. When the active solver does not provide a particular metadata accessor, the corresponding filter is not applied.
 """
 
-function user_callback(cb_data, master::Master, log::BendersBnBLog, param::BendersBnBParam, callback::UserCallback)
-    status = JuMP.callback_node_status(cb_data, master.model)
+function user_callback(
+    cb_data,
+    master::AbstractMaster,
+    log::BendersBnBLog,
+    param::BendersBnBParam,
+    callback::UserCallback,
+)
+    model = master_model(master)
+    x_variables = linking_variables(master)
+    t_variables = auxiliary_variables(master)
+    status = JuMP.callback_node_status(cb_data, model)
     
     if status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
         log.fractional_nodes_since_cut += 1
@@ -57,9 +66,9 @@ function user_callback(cb_data, master::Master, log::BendersBnBLog, param::Bende
             log.fractional_nodes_since_cut = 0
             
             node_count = callback.param.node_count == -1 ? nothing :
-                callback_node_count(cb_data, master.model)
+                callback_node_count(cb_data, model)
             node_depth = callback.param.depth == -1 ? nothing :
-                callback_node_depth(cb_data, master.model)
+                callback_node_depth(cb_data, model)
 
             process_node =
                 (isnothing(node_count) || node_count <= callback.param.node_count) &&
@@ -68,20 +77,20 @@ function user_callback(cb_data, master::Master, log::BendersBnBLog, param::Bende
             if process_node
                 # Create state and get current variable values
                 state = BendersBnBState()
-                state.values[:x] = JuMP.callback_value.(cb_data, master.x)
-                state.values[:t] = JuMP.callback_value.(cb_data, master.t)
+                state.values[:x] = JuMP.callback_value.(cb_data, x_variables)
+                state.values[:t] = JuMP.callback_value.(cb_data, t_variables)
                 
                 # Generate cuts
                 state.oracle_time = @elapsed begin
                     state.is_in_L, hyperplanes, state.f_x = generate_cuts(callback.oracle, state.values[:x], state.values[:t]; time_limit = get_sec_remaining(log, param))
-                    cuts = !state.is_in_L ? hyperplanes_to_expression(master.model, hyperplanes, master.x, master.t) : []
+                    cuts = !state.is_in_L ? hyperplanes_to_expression(model, hyperplanes, x_variables, t_variables) : []
                     state.num_cuts += length(hyperplanes)
                 end
 
                 # Add cuts
                 for cut in cuts
                     cut_constraint = @build_constraint(0 >= cut)
-                    MOI.submit(master.model, MOI.UserCut(cb_data), cut_constraint)
+                    MOI.submit(model, MOI.UserCut(cb_data), cut_constraint)
                 end
                 
                 # Record node information

@@ -62,7 +62,7 @@ function preprocess!(master::AbstractMaster, preprocessing::LPRelaxationPreproce
     seq_param.time_limit = max(0.0, min(time_limit, seq_param.time_limit))
     
     # Relax integrality, ensure undo() always runs even on error
-    undo = relax_integrality(master.model)
+    undo = relax_integrality(master_model(master))
     
     # measure time and ensure undo() is called even if solve! errors
     try
