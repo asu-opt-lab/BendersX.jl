@@ -212,10 +212,11 @@ mutable struct SeparableOracle <: AbstractOracle
             for k in eachindex(subproblem_groups)
                 length(subproblem_groups[k]) == auxiliary_dimensions[k] || throw(
                     DimensionMismatch(
-                        "SeparableOracle: when auxiliary_indices is omitted, " *
-                        "component oracle $k represents " *
-                        "$(length(subproblem_groups[k])) subproblems but has " *
-                        "auxiliary dimension $(auxiliary_dimensions[k]).",
+                        "SeparableOracle: auxiliary_indices can be omitted only when " *
+                        "each represented subproblem corresponds to one auxiliary variable. " *
+                        "Component oracle $k represents $(length(subproblem_groups[k])) " *
+                        "subproblems but has auxiliary dimension $(auxiliary_dimensions[k]). " *
+                        "Please provide auxiliary_indices explicitly.",
                     ),
                 )
             end
