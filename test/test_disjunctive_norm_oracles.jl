@@ -17,6 +17,8 @@ struct DirectionalVectorTTestOracle <: BendersX.AbstractTypicalOracle end
 
 struct DcglpInterruptionTestOracle <: BendersX.AbstractTypicalOracle end
 
+BendersX.auxiliary_dimension(::DirectionalVectorTTestOracle) = 2
+
 struct ExtensionContractNormalization <: BendersX.AbstractNormalization end
 struct MissingContractNormalization <: BendersX.AbstractNormalization end
 
@@ -55,7 +57,7 @@ function update_continuous_disjunctive_norm_master!(model::Model, data::Disjunct
     return (x = x,), t
 end
 
-function update_disjunctive_norm_sub!(model::Model, data::DisjunctiveNormTestData, scen_idx::Int; x)
+function update_disjunctive_norm_sub!(model::Model, data::DisjunctiveNormTestData, subproblem_idx::Int; x)
     set_optimizer(model, disjunctive_norm_optimizer())
     n_facilities, n_customers = size(data.costs)
 

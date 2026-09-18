@@ -13,6 +13,8 @@ using JuMP
     include("ufl.jl")
     include("cfl.jl")
     include("scfl.jl")
+    include("scfl_separable_split.jl")
+    include("suflp.jl")
     include("snip.jl")
     @info "Sequential Disjunctive Tests completed"
 end

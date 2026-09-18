@@ -32,7 +32,7 @@ The user supplies the subproblem through a model-update function. To use general
         data,
         master::Master;
         model = update_sub_model!,
-        scen_idx::Int = 0,
+        subproblem_idx::Int = 0,
         param::ClassicalOracleParam = ClassicalOracleParam(),
         optimizer = DEFAULT_OPTIMIZER,
     )
@@ -57,7 +57,7 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
 
     function ClassicalOracle(data, master::Master;
                             model = update_sub_model!,
-                            scen_idx::Int=0, 
+                            subproblem_idx::Int=0,
                             param::ClassicalOracleParam = ClassicalOracleParam(),
                             optimizer = DEFAULT_OPTIMIZER)
     
@@ -73,7 +73,7 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
             @constraint(sub_model, fix_x, x .== 0)
 
             # Build the submodel using user-defined model update, passing the copied variables
-            result = model(sub_model, data, scen_idx; x_copy...)
+            result = model(sub_model, data, subproblem_idx; x_copy...)
             
             # Validate that the subproblem is LP-compatible for typical oracles
             _validate_lp_compatibility(sub_model)
@@ -83,8 +83,6 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
 
             new(param, sub_model, fix_x, gbc_lhs, gbc_rhs, gbc_sense)
     end
-
-    ClassicalOracle() = new()
 end
 
 """

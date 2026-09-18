@@ -14,18 +14,18 @@ include(normpath(joinpath(@__DIR__, "..", "solver_defaults.jl")))
     instances = 1:5
 
     # GBC-enabled subproblem customization (y[i,j] <= x[i] via GBC)
-    function update_sub_gbc_model!(model::Model, data::SCFLPData, scen_idx::Int; x)
+    function update_sub_gbc_model!(model::Model, data::SCFLPData, subproblem_idx::Int; x)
         optimizer = optimizer_with_attributes(CPLEX.Optimizer, "CPXPARAM_Threads" => 7, "CPX_PARAM_EPRHS" => 1e-9, "CPX_PARAM_EPOPT" => 1e-9, "CPX_PARAM_NUMERICALEMPHASIS" => 1, MOI.Silent() => true)
         set_optimizer(model, optimizer)
 
         I, J = data.n_facilities, data.n_customers
         @variable(model, y[1:I, 1:J] >= 0)
         # Set objective
-        cost_demands = data.costs .* data.demands[scen_idx]'
+        cost_demands = data.costs .* data.demands[subproblem_idx]'
         @objective(model, Min, sum(cost_demands .* y))
         # Add constraints
         @constraint(model, demand[j in 1:J], sum(y[:,j]) == 1)
-        @constraint(model, capacity[i in 1:I], sum(data.demands[scen_idx][:] .* y[i,:]) <= data.capacities[i] * x[i])
+        @constraint(model, capacity[i in 1:I], sum(data.demands[subproblem_idx][:] .* y[i,:]) <= data.capacities[i] * x[i])
 
         # Return GBC tuple: y[i,j] <= x[i]
         gbc_lhs = vec(y)

@@ -19,17 +19,17 @@ function update_master_model!(model::Model, data::UFLPData)
 end
 
 """
-    update_sub_model!(model::Model, data::UFLPData, scen_idx::Int; x)
+    update_sub_model!(model::Model, data::UFLPData, subproblem_idx::Int; x)
 
 Formulate the UFLP subproblem in `model`.
 
 The subproblem assigns each customer to an open facility and minimizes the demand-weighted assignment cost. The master variables `x` link facility availability to the assignment variables.
 
-The argument `scen_idx` is unused because the UFLP formulation is deterministic.
+The argument `subproblem_idx` is unused because the UFLP formulation is deterministic.
 
 Returns `nothing`.
 """
-function update_sub_model!(model::Model, data::UFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::UFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers
 
     @variable(model, y[1:I, 1:J] >= 0)
@@ -43,17 +43,17 @@ function update_sub_model!(model::Model, data::UFLPData, scen_idx::Int; x)
 end
 
 """
-    update_sub_gbc_model!(model::Model, data::UFLPData, scen_idx::Int; x)
+    update_sub_gbc_model!(model::Model, data::UFLPData, subproblem_idx::Int; x)
 
 Formulate the UFLP subproblem using generalized bound constraints (GBCs).
 
 The assignment and objective components are identical to those of [`update_sub_model!`](@ref), but the linking constraints `y[i, j] <= x[i]` are returned as GBCs rather than added directly to `model`.
 
-The argument `scen_idx` is unused because the UFLP formulation is deterministic.
+The argument `subproblem_idx` is unused because the UFLP formulation is deterministic.
 
 Returns `(gbc_lhs, gbc_rhs, gbc_sense)`, representing the linking constraints `y[i, j] <= x[i]`.
 """
-function update_sub_gbc_model!(model::Model, data::UFLPData, scen_idx::Int; x)
+function update_sub_gbc_model!(model::Model, data::UFLPData, subproblem_idx::Int; x)
     
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)

@@ -63,7 +63,7 @@ function solve_mip_pareto_reference(data::SimpleParetoTestData)
     return objective_value(model)
 end
 
-function update_sub_pareto_model!(model::Model, data::SimpleParetoTestData, scen_idx::Int; x)
+function update_sub_pareto_model!(model::Model, data::SimpleParetoTestData, subproblem_idx::Int; x)
     optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
     set_optimizer(model, optimizer)
     
@@ -147,7 +147,7 @@ end
         master = Master(data; model = update_master_pareto_model!)
         param = ParetoOracleParam(fill(0.5, data.n_facilities))
 
-        function update_sub_with_interval_model!(model::Model, data::SimpleParetoTestData, scen_idx::Int; x)
+        function update_sub_with_interval_model!(model::Model, data::SimpleParetoTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -188,7 +188,7 @@ end
 
         data = ParetoIntervalReformData(2)
 
-        function update_sub_interval_reform_model!(model::Model, data::ParetoIntervalReformData, scen_idx::Int; x)
+        function update_sub_interval_reform_model!(model::Model, data::ParetoIntervalReformData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
             @variable(model, y >= 0)
@@ -220,7 +220,7 @@ end
         master = Master(data; model = update_master_pareto_model!)
         param = ParetoOracleParam(fill(0.5, data.n_facilities))
 
-        function update_sub_vectorized_model!(model::Model, data::SimpleParetoTestData, scen_idx::Int; x)
+        function update_sub_vectorized_model!(model::Model, data::SimpleParetoTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -255,7 +255,7 @@ end
         master = Master(data; model = update_master_pareto_model!)
         param = ParetoOracleParam(fill(0.5, data.n_facilities))
 
-        function update_sub_all_patterns_model!(model::Model, data::SimpleParetoTestData, scen_idx::Int; x)
+        function update_sub_all_patterns_model!(model::Model, data::SimpleParetoTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -291,7 +291,7 @@ end
         data = create_pareto_test_data()
         mip_opt = solve_mip_pareto_reference(data)
 
-        function update_sub_interval_converge_model!(model::Model, data::SimpleParetoTestData, scen_idx::Int; x)
+        function update_sub_interval_converge_model!(model::Model, data::SimpleParetoTestData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
             set_optimizer(model, optimizer)
 
@@ -525,7 +525,7 @@ end
             # Test that σ variable is added with correct bounds (σ <= 0)
             data = ParetoReformTestData(2)
 
-            function update_sub_sigma_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_sigma_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -551,7 +551,7 @@ end
             # Verify fixing constraints: x + x*·σ = x_0 exist for each decision variable
             data = ParetoReformTestData(2)
 
-            function update_sub_fix_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_fix_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -584,7 +584,7 @@ end
             # Test that problem constraints get b*σ added (where b is RHS)
             data = ParetoReformTestData(2)
 
-            function update_sub_bsigma_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_bsigma_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -619,7 +619,7 @@ end
             # Test that σ is added to objective (initially with 0 coefficient)
             data = ParetoReformTestData(2)
 
-            function update_sub_objsigma_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_objsigma_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -652,7 +652,7 @@ end
             # Verify standard model has fix_x constraints
             data = ParetoReformTestData(2)
 
-            function update_sub_stdfix_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_stdfix_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -681,7 +681,7 @@ end
             # Test that == constraints also get b*σ term
             data = ParetoReformTestData(2)
 
-            function update_sub_eq_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_eq_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 
@@ -708,7 +708,7 @@ end
             # Test constraint with RHS = 0 gets σ coefficient = 0
             data = ParetoReformTestData(2)
 
-            function update_sub_zero_model!(model::Model, data::ParetoReformTestData, scen_idx::Int; x)
+            function update_sub_zero_model!(model::Model, data::ParetoReformTestData, subproblem_idx::Int; x)
                 optimizer = optimizer_with_attributes(HiGHS.Optimizer, MOI.Silent() => true)
                 set_optimizer(model, optimizer)
 

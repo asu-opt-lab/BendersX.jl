@@ -43,7 +43,7 @@ mutable struct CFLKnapsackOracle <: AbstractTypicalOracle
     
     function CFLKnapsackOracle(data, master::Master;
                             model = update_sub_model!,
-                            scen_idx::Int=-1, 
+                            subproblem_idx::Int=-1,
                             param::CFLKnapsackOracleParam = CFLKnapsackOracleParam(),
                             optimizer = DEFAULT_OPTIMIZER)
         @debug "Building knapsack oracle for CFLP"
@@ -58,17 +58,15 @@ mutable struct CFLKnapsackOracle <: AbstractTypicalOracle
         @constraint(sub_model, fix_x, x .== 0)
 
         # Build the submodel using user-defined model update, passing the copied variables
-        result = model(sub_model, data, scen_idx; x_copy...)
+        result = model(sub_model, data, subproblem_idx; x_copy...)
         
         # Parse the result to extract GBC information using shared helper
         gbc_lhs, gbc_rhs, gbc_sense = _parse_gbc_result(result, x)
 
-        facility_knapsack_info = scen_idx == -1 ? FacilityKnapsackInfo(data.costs, data.demands, data.capacities) : FacilityKnapsackInfo(data.costs, data.demands[scen_idx], data.capacities)
+        facility_knapsack_info = subproblem_idx == -1 ? FacilityKnapsackInfo(data.costs, data.demands, data.capacities) : FacilityKnapsackInfo(data.costs, data.demands[subproblem_idx], data.capacities)
 
         new(param, sub_model, fix_x, facility_knapsack_info, gbc_lhs, gbc_rhs, gbc_sense)
     end
-    
-    CFLKnapsackOracle() = new()
 end
 
 function generate_cuts(oracle::CFLKnapsackOracle, x_value::Vector{Float64}, t_value::Vector{Float64}; tol_normalize = 1.0, time_limit = 3600)

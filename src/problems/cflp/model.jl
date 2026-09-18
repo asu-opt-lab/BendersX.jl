@@ -21,17 +21,17 @@ end
 
 
 """
-    update_sub_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+    update_sub_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
 
 Formulate the CFLP subproblem in `model`.
 
 The subproblem assigns customer demand to open facilities while respecting facility capacities and minimizes the demand-weighted assignment cost. The master variables `x` link facility availability and capacity to the assignment variables.
 
-The argument `scen_idx` is unused because the CFLP formulation is deterministic.
+The argument `subproblem_idx` is unused because the CFLP formulation is deterministic.
 
 Returns `nothing`.
 """
-function update_sub_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+function update_sub_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)
     # Set objective
@@ -45,17 +45,17 @@ function update_sub_model!(model::Model, data::CFLPData, scen_idx::Int; x)
 end
 
 """
-    update_sub_gbc_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+    update_sub_gbc_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
 
 Formulate the CFLP subproblem using generalized bound constraints (GBCs).
 
 The demand and capacity constraints are included directly in `model`, while the linking constraints `y[i, j] <= x[i]` are returned as GBCs rather than added explicitly to the subproblem.
 
-The argument `scen_idx` is unused because the CFLP formulation is deterministic.
+The argument `subproblem_idx` is unused because the CFLP formulation is deterministic.
 
 Returns `(gbc_lhs, gbc_rhs, gbc_sense)`, representing the linking constraints `y[i, j] <= x[i]`.
 """
-function update_sub_gbc_model!(model::Model, data::CFLPData, scen_idx::Int; x)
+function update_sub_gbc_model!(model::Model, data::CFLPData, subproblem_idx::Int; x)
     
     I, J = data.n_facilities, data.n_customers
     @variable(model, y[1:I, 1:J] >= 0)

@@ -34,7 +34,7 @@ export LpDistanceNormalization
 export ReversePolarNormalization
 export BendersSeqParam, BendersSeqInOutParam, BendersBnBParam
 export LazyCallback, UserCallback, NoUserCallback, UserCallbackParam
-export LPRelaxationPreprocessing, NoPreprocessing, DisjunctiveLPRelaxationPreprocessing
+export LPRelaxationPreprocessing, NoPreprocessing
 
 # Common runtime statuses and configuration values
 export TerminationStatus, NotSolved, TimeLimit, Optimal, InfeasibleOrNumericalIssue
@@ -53,7 +53,8 @@ public AbstractLoopState, AbstractLoopLog, AbstractLoopParam
 public AbstractBendersSeqState, AbstractBendersSeqLog, AbstractBendersSeqParam
 public AbstractBendersBnBState, AbstractBendersBnBLog, AbstractBendersBnBParam
 public SplitIndexSelectionRule, DisjunctiveCutsAppendRule
-public generate_cuts, add_normalization_constraint!, update_dcglp_upper_bound_and_gap!
+public generate_cuts, auxiliary_dimension
+public add_normalization_constraint!, update_dcglp_upper_bound_and_gap!
 public disjunctive_cut_normalization_value
 public callback_node_count, callback_node_depth
 export update_master_model!, update_sub_model!
@@ -67,12 +68,13 @@ public TimeLimitException, UnexpectedModelStatusException, UnimplementedInterfac
 public AlgorithmException, UnsupportedModelException
 
 # Problem-specific helpers available via `using BendersX`
-export CFLPData, UFLPData, SCFLPData, SNIPData
+export CFLPData, UFLPData, SCFLPData, SUFLPData, SNIPData
 export CFLKnapsackOracle, CFLKnapsackOracleParam
 export UFLKnapsackOracle, UFLKnapsackOracleParam
 export read_GK_data, read_cfl_file, read_cflp_benchmark_data
 export read_uflp_benchmark_data, read_Simple_data
 export read_stochastic_capacited_facility_location_problem, read_snip_data
+export read_stochastic_uncapacitated_facility_location_problem
 export update_knapsack_master_model!, update_sub_gbc_model!
 
 end # module BendersX

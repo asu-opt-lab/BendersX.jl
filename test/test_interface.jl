@@ -264,7 +264,7 @@ end
         return (x = x,), t
     end
 
-    function update_sub_model!(model::Model, data::AttrData, scen_idx::Int; x)
+    function update_sub_model!(model::Model, data::AttrData, subproblem_idx::Int; x)
         set_optimizer_attribute(model, MOI.Silent(), true)
         @variable(model, y >= 0)
         @objective(model, Min, y)
@@ -307,7 +307,7 @@ end
         return (x = x,), t
     end
 
-    function keyword_subproblem_model!(model::Model, data::ModelKeywordData, scen_idx::Int; x)
+    function keyword_subproblem_model!(model::Model, data::ModelKeywordData, subproblem_idx::Int; x)
         @variable(model, y[1:data.n_facilities, 1:data.n_customers] >= 0)
         @objective(model, Min, sum(data.costs[i, j] * y[i, j] for i in 1:data.n_facilities, j in 1:data.n_customers))
         @constraint(model, demand[j in 1:data.n_customers], sum(y[:, j]) == data.demands[j])
@@ -380,10 +380,10 @@ end
         return (x = x,), t
     end
 
-    function update_sub_model!(model::Model, data::SeparableData, scen_idx::Int; x)
+    function update_sub_model!(model::Model, data::SeparableData, subproblem_idx::Int; x)
         @variable(model, y >= 0)
         @objective(model, Min, y)
-        @constraint(model, y >= 1 - x[scen_idx])
+        @constraint(model, y >= 1 - x[subproblem_idx])
         return nothing
     end
 
@@ -397,7 +397,7 @@ end
     @test f_x == [1.0, 1.0]
     @test all(occursin("HiGHS", solver_name(suboracle.model)) for suboracle in oracle.oracles)
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(BendersX.TimeLimitException("test timeout")),
         SeparableInterruptionTestOracle(nothing),
     ]
@@ -410,7 +410,7 @@ end
     @test timeout_error isa BendersX.TimeLimitException
     @test timeout_error.msg == "test timeout"
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(nothing),
         SeparableInterruptionTestOracle(BendersX.UnexpectedModelStatusException("test status")),
     ]
@@ -423,7 +423,7 @@ end
     @test status_error isa BendersX.UnexpectedModelStatusException
     @test status_error.msg == "test status"
 
-    oracle.oracles = BendersX.AbstractTypicalOracle[
+    oracle.oracles = BendersX.AbstractOracle[
         SeparableInterruptionTestOracle(ArgumentError("test generic error")),
         SeparableInterruptionTestOracle(nothing),
     ]
@@ -516,7 +516,7 @@ end
             return (u = u, ), t
         end
 
-        function update_sub_model!(model::Model, data::EmptyData, scen_idx::Int; u)
+        function update_sub_model!(model::Model, data::EmptyData, subproblem_idx::Int; u)
 
             @variable(model, y[1:10] >= 0)
             @objective(model, Min, sum(y))
@@ -541,7 +541,7 @@ end
             return (u = u, ), t
         end
 
-        function update_sub_model!(model::Model, data::EmptyData, scen_idx::Int; u)
+        function update_sub_model!(model::Model, data::EmptyData, subproblem_idx::Int; u)
 
             @variable(model, y[1:10] >= 0)
             @objective(model, Min, sum(y))
@@ -569,7 +569,7 @@ end
             return (u = u, v = v, w = w), t
         end
 
-        function update_sub_model!(model::Model, data::EmptyData, scen_idx::Int; u, v, w)
+        function update_sub_model!(model::Model, data::EmptyData, subproblem_idx::Int; u, v, w)
 
             @variable(model, y[1:10] >= 0)
             @objective(model, Min, sum(y))

@@ -58,6 +58,23 @@ function create_mip_model(data::SCFLPData)
     return model
 end
 
+function create_mip_model(data::SUFLPData)
+    model = Model(mip_optimizer)
+    I, J, N = data.n_facilities, data.n_customers, data.n_scenarios
+
+    @variable(model, x[1:I], Bin)
+    @variable(model, y[1:I, 1:J, 1:N] >= 0)
+
+    @objective(model, Min,
+        sum(data.probabilities[s] * data.costs[i, j] * data.demands[s][j] * y[i, j, s] for i in 1:I, j in 1:J, s in 1:N) +
+        data.fixed_costs' * x
+    )
+
+    @constraint(model, demand[j in 1:J, s in 1:N], sum(y[:, j, s]) == 1)
+    @constraint(model, facility_open[i in 1:I, j in 1:J, s in 1:N], y[i, j, s] <= x[i])
+    return model
+end
+
 function create_mip_model(data::SNIPData)
     model = Model(mip_optimizer)
     K = data.num_scenarios
@@ -133,6 +150,16 @@ function build_scflp_rows()
     return rows
 end
 
+function build_suflp_rows()
+    rows = NamedTuple[]
+    for i in 1:5
+        instance_name = "f25-c50-s64-r10-$i"
+        data = read_stochastic_uncapacitated_facility_location_problem(instance_name)
+        push!(rows, (instance_name = instance_name, objective_value = solve_reference_objective(data, instance_name)))
+    end
+    return rows
+end
+
 function build_snip_rows()
     rows = NamedTuple[]
     instance_name = "instance=0;snipno=0;budget=30.0"
@@ -146,11 +173,13 @@ function main()
     uflp_rows = build_uflp_rows()
     cflp_rows = build_cflp_rows()
     scflp_rows = build_scflp_rows()
+    suflp_rows = build_suflp_rows()
     snip_rows = build_snip_rows()
 
     write_reference_csv("uflp.csv", uflp_rows)
     write_reference_csv("cflp.csv", cflp_rows)
     write_reference_csv("scflp.csv", scflp_rows)
+    write_reference_csv("suflp.csv", suflp_rows)
     write_reference_csv("snip.csv", snip_rows)
 end
 

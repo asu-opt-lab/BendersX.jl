@@ -95,8 +95,78 @@ oracle = SeparableOracle(
 )
 ```
 
-Any oracle whose concrete type `T <: AbstractTypicalOracle` implements the
+Any oracle whose concrete type `T <: AbstractOracle` implements the
 required constructor interface can be used as the template.
+
+`SeparableOracle` can also wrap explicitly constructed oracles, including
+disjunctive oracles. A per-scenario split construction gives every scenario
+its own `SplitOracle` while each DCGLP retains the global auxiliary space:
+
+```julia
+split_oracles = [
+    begin
+        typical_pair = ntuple(2) do _
+            SeparableOracle(
+                master,
+                [ClassicalOracle(data, master; subproblem_idx = j)];
+                subproblem_indices = [j],
+            )
+        end
+        SplitOracle(
+            master,
+            typical_pair;
+            param = deepcopy(split_param),
+        )
+    end
+    for j in 1:N
+]
+
+oracle = SeparableOracle(master, split_oracles)
+```
+
+Each component declares the number of represented `t` values through
+`auxiliary_dimension`. For leaf components, the wrapper extracts the assigned
+coordinates of the global `t` and embeds each returned cut into the master
+auxiliary space. The `auxiliary_indices` mapping need not be
+contiguous. Contained `SeparableOracle`s and `SplitOracle`s already receive the
+global `t` and return global cuts. Their grouped `subproblem_indices`, such as
+`[[1, 2], [3, 4]]`, record which subproblems belong to each component.
+
+### SUFLP with customer-disaggregated scenario blocks
+
+For [`SUFLPData`](@ref), [`update_knapsack_master_model!`](@ref) creates
+`t[customer, scenario]` and returns `vec(t)`. Julia's column-major ordering
+therefore keeps all customers of one scenario in a contiguous block. A
+scenario-aware `UFLKnapsackOracle` reports a block size equal to the number of
+customers, and `SeparableOracle` combines those blocks automatically:
+
+```julia
+master = Master(data; model = update_knapsack_master_model!)
+oracle = SeparableOracle(
+    data,
+    master,
+    UFLKnapsackOracle,
+    data.n_scenarios;
+    auxiliary_indices = [
+        collect(((subproblem_idx - 1) * data.n_customers + 1):
+                (subproblem_idx * data.n_customers))
+        for subproblem_idx in 1:data.n_scenarios
+    ],
+    sub_oracle_param = UFLKnapsackOracleParam(
+        add_only_violated_cuts = true,
+    ),
+)
+env = BendersSeq(master, oracle)
+solve!(env)
+```
+
+Scenario probabilities appear only as coefficients of the master auxiliary
+variables. The scenario subproblems and knapsack oracles return unweighted
+recourse values, avoiding accidental double weighting. To use local
+disjunctive separation, first place each scenario-specific oracle in a
+one-component `SeparableOracle` carrying that scenario's global auxiliary
+block. Construct a `SplitOracle` from two matching components for each
+scenario, then combine those split oracles in the outer `SeparableOracle`.
 
 !!! note
     `SeparableOracle` evaluates subproblems with Julia threads. The default GLPK
@@ -149,6 +219,29 @@ oracle = SplitOracle(
 The DCGLP optimizer can be configured through the standard JuMP
 `optimizer_with_attributes` interface, as shown above. `oracle_kappa` and `oracle_nu`
 can be any typical oracles that are compatible with the subproblem.
+
+These two composition orders have different meanings:
+
+- `SplitOracle(SeparableOracle(...), SeparableOracle(...))` always builds its
+  DCGLP in the master's global auxiliary space. Matching component oracles
+  determine which `t[j]` coordinates their subproblems update. Returned cuts
+  retain the coefficients of every auxiliary variable in the global DCGLP.
+- `SeparableOracle` containing several `SplitOracle`s evaluates one global-space
+  DCGLP per assigned group and directly combines the returned global cuts.
+
+`SplitOracle` always operates on the master's complete global auxiliary vector.
+To separate only a subset of subproblems, represent that subset through both
+typical `SeparableOracle`s. Those `SeparableOracle`s map their represented
+subproblems to the global auxiliary space, while `SplitOracle.generate_cuts`
+continues to receive the complete global `t`.
+
+`SplitOracle` obtains the number of represented auxiliary variables from its
+component oracles, while the DCGLP dimension remains `master.dim_t`. A typical
+oracle uses dimension one by default and overrides `auxiliary_dimension` only
+when it represents a larger auxiliary space. `SeparableOracle` reports the sum
+of its component-oracle dimensions. The two components of a `SplitOracle` must
+report the same dimension and, when they are `SeparableOracle`s, must carry
+identical `subproblem_indices` and `auxiliary_indices`.
 
 ### Configuring `SplitOracle` Behavior
 

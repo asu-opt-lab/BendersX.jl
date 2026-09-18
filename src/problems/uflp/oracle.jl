@@ -51,7 +51,7 @@ mutable struct UFLKnapsackOracle <: AbstractTypicalOracle
     obj_values::Vector{Float64}
 
     function UFLKnapsackOracle(data::UFLPData; 
-        scen_idx::Int=-1, 
+        subproblem_idx::Int=-1,
         param::UFLKnapsackOracleParam = UFLKnapsackOracleParam())
             @debug "Building knapsack oracle for UFLP"
             
@@ -64,9 +64,9 @@ mutable struct UFLKnapsackOracle <: AbstractTypicalOracle
 
             new(param, sorted_cost_demands, sorted_indices, J, obj_values)
     end
-
-    UFLKnapsackOracle() = new()
 end
+
+auxiliary_dimension(oracle::UFLKnapsackOracle) = oracle.J
 
 function generate_cuts(oracle::UFLKnapsackOracle, x_value::Vector{Float64}, t_value::Vector{Float64}; tol_normalize = 1.0, time_limit = 3600.0)
     tic = time()

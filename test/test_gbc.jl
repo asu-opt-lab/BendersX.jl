@@ -85,7 +85,7 @@ end
         data = create_test_data()
         mip_opt = solve_mip_reference(data)
         
-        function update_sub_upper_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_upper_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -142,7 +142,7 @@ end
 
         mip_opt = solve_mip_scenario_3(data)
         
-        function update_sub_lower_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_lower_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -201,7 +201,7 @@ end
 
         mip_opt = solve_mip_scenario_4(data)
         
-        function update_sub_fixed_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_fixed_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -257,7 +257,7 @@ end
 
         mip_opt = solve_mip_scenario_5(data)
         
-        function update_sub_scaled_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_scaled_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -325,7 +325,7 @@ end
             return (x = x, ), t
         end
         
-        function update_sub_affine_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_affine_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -383,7 +383,7 @@ end
 
         mip_opt = solve_mip_scenario_7(data)
         
-        function update_sub_partial_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_partial_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -444,7 +444,7 @@ end
 
         mip_opt = solve_mip_scenario_8(data)
         
-        function update_sub_mixed_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_mixed_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -484,7 +484,7 @@ end
         data = create_test_data()
         mip_opt = solve_mip_reference(data)
         
-        function update_sub_no_gbc_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_no_gbc_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -515,7 +515,7 @@ end
         data = create_test_data()
         mip_opt = solve_mip_reference(data)
         
-        function update_sub_union_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_union_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -561,7 +561,7 @@ end
         data = create_test_data()
         
         # 1. Test DimensionMismatch
-        function update_sub_dim_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_dim_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             gbc_lhs = [VariableRef(model, MOI.VariableIndex(1))]
             gbc_rhs = union_type([x[1], x[1]]) # Length 2
             gbc_sense = [UpperBound]
@@ -575,13 +575,13 @@ end
         @test_throws DimensionMismatch ClassicalOracle(data, master; model = update_sub_dim_error_model!)
         
         # 2. Test ArgumentError (Invalid tuple length)
-        function update_sub_arg_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_arg_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             return ([x[1]], [x[1]]) # Length 2, expected 3
         end
         @test_throws ArgumentError ClassicalOracle(data, master; model = update_sub_arg_error_model!)
 
         # 3. Test Empty LHS Warning
-        function update_sub_empty_warn_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_empty_warn_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             return VariableRef[], Union{VariableRef, AffExpr}[], GBCBoundType[]
         end
         
@@ -591,7 +591,7 @@ end
         end
 
         # 4. Test ArgumentError: gbc_lhs contains a master variable (from x)
-        function update_sub_lhs_master_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_lhs_master_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -618,7 +618,7 @@ end
         @test occursin("should only contain a single subproblem variable", err.msg)
 
         # 5. Test ArgumentError: gbc_rhs contains a non-master variable (subproblem variable)
-        function update_sub_rhs_nonmaster_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_rhs_nonmaster_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -647,7 +647,7 @@ end
 
 
         # 6. Test ArgumentError: gbc_lhs contains a non-VariableRef element.
-        function update_sub_lhs_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_lhs_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -675,7 +675,7 @@ end
         @test occursin("not a VariableRef", err.msg)
 
         # 7. Test ArgumentError: gbc_rhs contains a non-affine expression.
-        function update_sub_rhs_nonaffine_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_rhs_nonaffine_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)
@@ -703,7 +703,7 @@ end
         @test occursin("contains a non-affine expression", err.msg)
 
         # 8. Test ArgumentError: gbc_sense contains not acceptable value
-        function update_sub_sense_error_model!(model::Model, data::SimpleAssignmentData, scen_idx::Int; x)
+        function update_sub_sense_error_model!(model::Model, data::SimpleAssignmentData, subproblem_idx::Int; x)
             optimizer = optimizer_with_attributes(
                 CPLEX.Optimizer, "CPXPARAM_Threads" => 1, MOI.Silent() => true)
             set_optimizer(model, optimizer)

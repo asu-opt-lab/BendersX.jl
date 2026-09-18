@@ -102,7 +102,11 @@ Split-based disjunctive Benders oracle.
 - `param::SplitOracleParam`: Configuration of the split oracle.
 - `normalization::AbstractNormalization`: Normalization scheme used for disjunctive cut generation. See [`AbstractNormalization`](@ref) for available options.
 - `dcglp::Model`: The relaxed DCGLP problem used to generate disjunctive cuts.
-- `typical_oracles::Tuple{<:AbstractTypicalOracle,<:AbstractTypicalOracle}`: Typical Benders oracles associated with the two sides of the split.
+- `typical_oracles::Tuple{<:AbstractOracle,<:AbstractOracle}`: Typical oracles associated with the two sides of the split.
+- `dim_auxiliary::Int`: Number of auxiliary variables represented by the
+  component oracles.
+- `auxiliary_indices::Vector{Int}`: Positions in the master's auxiliary vector
+  represented by the component oracles.
 - `disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}`: Previously generated disjunctive cuts grouped by split index.
 - `disjunctive_cuts::Vector{Hyperplane}`: Collection of generated disjunctive cuts.
 - `splits::Vector{Tuple{SparseVector{Float64,Int},Float64}}`: Split disjunctions generated during cut separation.
@@ -115,17 +119,24 @@ Split-based disjunctive Benders oracle.
         normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
     ) where {
-    T1<:AbstractTypicalOracle,
-    T2<:AbstractTypicalOracle,
+    T1<:AbstractOracle,
+    T2<:AbstractOracle,
 }
 
-Construct a split oracle using two typical oracles, a normalization scheme, and the specified split-oracle configuration.
+Construct a split oracle using two typical oracles, a normalization scheme,
+and the specified split-oracle configuration. The two component oracles must
+have the same auxiliary-variable dimension. When both components are
+`SeparableOracle`s, they must describe the same subproblems and global
+auxiliary positions. The DCGLP always uses the master's complete auxiliary space;
+coordinates outside those positions are not updated by the component oracles,
+but remain part of the global DCGLP and returned cuts. Other component oracles
+must operate on the complete master auxiliary vector.
 
 See also: [`SplitOracleParam`](@ref), [`AbstractNormalization`](@ref)
 """
 mutable struct SplitOracle{
-    T1 <: AbstractTypicalOracle,
-    T2 <: AbstractTypicalOracle,
+    T1 <: AbstractOracle,
+    T2 <: AbstractOracle,
     N <: AbstractNormalization,
 } <: AbstractDisjunctiveOracle
     param::SplitOracleParam
@@ -135,6 +146,8 @@ mutable struct SplitOracle{
     disjunctive_cuts_by_index::Vector{Vector{Hyperplane}}
     disjunctive_cuts::Vector{Hyperplane}
     splits::Vector{Tuple{SparseVector{Float64, Int}, Float64}}
+    dim_auxiliary::Int
+    auxiliary_indices::Vector{Int}
 
     function SplitOracle(
         master::AbstractMaster,
@@ -142,28 +155,113 @@ mutable struct SplitOracle{
         normalization::AbstractNormalization = LpDistanceNormalization(),
         param::SplitOracleParam = SplitOracleParam(),
     ) where {
-        T1<:AbstractTypicalOracle,
-        T2<:AbstractTypicalOracle,
+        T1 <: AbstractOracle,
+        T2 <: AbstractOracle,
     }
-        dcglp = build_dcglp(master, normalization, param)
-        
+        all(is_typical_oracle, typical_oracles) || throw(
+            ArgumentError(
+                "SplitOracle: both supplied oracles must be typical oracles."
+            ),
+        )
+
+        auxiliary_dimensions = auxiliary_dimension.(typical_oracles)
+        length(unique(auxiliary_dimensions)) == 1 || throw(
+            DimensionMismatch(
+                "SplitOracle: typical oracles must have the same " *
+                "auxiliary dimension; got $(auxiliary_dimensions).",
+            ),
+        )
+        dim_auxiliary = first(auxiliary_dimensions)
+
+        # If either typical oracle is a SeparableOracle, both must be SeparableOracles 
+        separable_typical_oracles = [oracle isa SeparableOracle for oracle in typical_oracles]
+
+        any(separable_typical_oracles) && !all(separable_typical_oracles) && throw(
+            ArgumentError(
+                "SplitOracle: the two typical oracles must either both be " *
+                "SeparableOracles or neither be a SeparableOracle.",
+            ),
+        )
+
+        if all(separable_typical_oracles)
+            first_oracle, second_oracle = typical_oracles
+
+            first_oracle.subproblem_indices ==
+            second_oracle.subproblem_indices || throw(
+                ArgumentError(
+                    "SplitOracle: the two typical SeparableOracles must represent the same " *
+                    "subproblems; got $(first_oracle.subproblem_indices) and " *
+                    "$(second_oracle.subproblem_indices)."
+                ),
+            )
+
+            first_oracle.auxiliary_indices ==
+            second_oracle.auxiliary_indices || throw(
+                DimensionMismatch(
+                    "SplitOracle: the two typical SeparableOracles must have the same " *
+                    "auxiliary_indices; got $(first_oracle.auxiliary_indices) and " *
+                    "$(second_oracle.auxiliary_indices)."
+                ),
+            )
+
+            first_oracle.dim_global_auxiliary ==
+            second_oracle.dim_global_auxiliary || throw(
+                DimensionMismatch(
+                    "SplitOracle: the two typical SeparableOracles must have the same " *
+                    "global auxiliary dimension; got " *
+                    "$(first_oracle.dim_global_auxiliary) and " *
+                    "$(second_oracle.dim_global_auxiliary).",
+                ),
+            )
+
+            first_oracle.dim_global_auxiliary == master.dim_t || throw(
+                DimensionMismatch(
+                    "SplitOracle: the typical SeparableOracle's global auxiliary dimension " *
+                    "$(first_oracle.dim_global_auxiliary) must equal " *
+                    "master.dim_t ($(master.dim_t)).",
+                ),
+            )
+
+            auxiliary_indices = vcat(first_oracle.auxiliary_indices...)
+        else
+            dim_auxiliary == master.dim_t || throw(
+                DimensionMismatch(
+                    "SplitOracle: each typical oracle must represent the full auxiliary " *
+                    "space when the typical oracles are not SeparableOracles; expected " *
+                    "auxiliary dimension $(master.dim_t), got $dim_auxiliary.",
+                ),
+            )
+
+            auxiliary_indices = collect(1:master.dim_t)
+        end
+        dcglp = build_dcglp(
+            master,
+            normalization,
+            param;
+            dim_t = master.dim_t,
+        )
+
         disjunctive_cuts_by_index = [
             Hyperplane[] for _ in 1:master.dim_x
         ]
         disjunctive_cuts = Hyperplane[]
         splits = Tuple{SparseVector{Float64,Int},Float64}[]
 
-        new{T1, T2, typeof(normalization)}(
+        new{T1,T2,typeof(normalization)}(
             param,
             normalization,
             dcglp,
             typical_oracles,
             disjunctive_cuts_by_index,
             disjunctive_cuts,
-            splits
+            splits,
+            dim_auxiliary,
+            auxiliary_indices,
         )
     end
 end
+
+auxiliary_dimension(oracle::SplitOracle) = oracle.dim_auxiliary
 
 """
     generate_cuts(
@@ -186,7 +284,7 @@ If the configured normalization requires fallback separation, or if disjunctive 
 
 - `oracle::SplitOracle`: Split-based disjunctive oracle.
 - `x_value`: Candidate values of the master variables `x`.
-- `t_value`: Candidate values of the auxiliary variables `t`.
+- `t_value`: Candidate values of the master's complete global auxiliary vector  `t`.
 - `tol_normalize`: Normalization factor for compatibility with the typical-oracle interface.
 - `time_limit`: Maximum time allowed for cut generation, in seconds.
 """
@@ -194,10 +292,16 @@ function generate_cuts(
     oracle::SplitOracle,
     x_value::Vector{Float64},
     t_value::Vector{Float64};
-    tol_normalize = 1.0, # just to match the signature of the typical oracle
+    tol_normalize = 1.0, # included for interface compatibility
     time_limit::Float64 = 3600.0
 )
     tic = time()
+
+    dim_global_auxiliary = length(oracle.dcglp[:st])
+    length(t_value) == dim_global_auxiliary || throw(DimensionMismatch(
+        "SplitOracle received t_value with length $(length(t_value)); " *
+        "expected the full global auxiliary dimension $dim_global_auxiliary.",
+    ))
 
     !is_applicable(oracle.normalization, oracle, x_value, t_value) &&
         return generate_cuts(oracle.typical_oracles[1], x_value, t_value; time_limit = max(time_limit - (time() - tic), 0.0))

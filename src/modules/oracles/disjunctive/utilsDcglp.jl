@@ -4,11 +4,14 @@
         master::AbstractMaster,
         normalization::AbstractNormalization,
         param::SplitOracleParam,
+        ; dim_t,
     )
 
 Build the DCGLP used by [`SplitOracle`](@ref).
 
-The method first constructs the common DCGLP formulation through `build_dcglp_base`, then adds the normalization constraint defined by `normalization`.
+The method first constructs the common global-auxiliary DCGLP formulation
+through `build_dcglp_base`, then adds the normalization constraint defined by
+`normalization`. `dim_t` is the master's complete auxiliary dimension.
 
 Returns the constructed JuMP model.
 """
@@ -16,8 +19,10 @@ function build_dcglp(
     master::AbstractMaster,
     normalization::AbstractNormalization,
     param::SplitOracleParam,
+    ;
+    dim_t::Int,
 )
-    dcglp, tau, sx, st = build_dcglp_base(master, param)
+    dcglp, tau, sx, st = build_dcglp_base(master, param; dim_t = dim_t)
 
     add_normalization_constraint!(normalization, master, dcglp, tau, sx, st)
 
@@ -28,11 +33,14 @@ end
     build_dcglp_base(
         master::AbstractMaster,
         param::SplitOracleParam,
+        ; dim_t,
     )
 
 Build the common DCGLP formulation shared by all normalization schemes.
 
-The method creates the disjunctive variables for the two sides of the split, transfers supported linear constraints and bounds from the master problem, and introduces the auxiliary variables `tau`, `sx`, and `st` used by the normalization.
+The method creates global auxiliary variables for the two sides of the split,
+transfers supported linear constraints and bounds from the master problem, and
+introduces the variables `tau`, `sx`, and `st` used by the normalization.
 
 Normalization-specific constraints are not added by this method.
 
@@ -44,12 +52,15 @@ variables required to define its normalization.
 function build_dcglp_base(
     master::AbstractMaster,
     param::SplitOracleParam,
+    ;
+    dim_t::Int,
 )
+    dim_t > 0 || throw(ArgumentError("build_dcglp_base: `dim_t` must be positive."))
     dcglp = Model(param.dcglp_param.optimizer)
     @variable(dcglp, omega_0[1:2] >= 0)
 
     @variable(dcglp, omega_x[1:2, 1:master.dim_x])
-    @variable(dcglp, omega_t[1:2, 1:master.dim_t])
+    @variable(dcglp, omega_t[1:2, 1:dim_t])
 
     @constraint(dcglp, [i in 1:2], omega_t[i, :] .>= -1.0e6 .* omega_0[i])
     @constraint(dcglp, coneta[i in 1:2, j in 1:master.dim_x], 0 >= -omega_0[i] + omega_x[i, j])
@@ -69,12 +80,12 @@ function build_dcglp_base(
 
     @variable(dcglp, tau)
     @variable(dcglp, sx[1:master.dim_x])
-    @variable(dcglp, st[1:master.dim_t])
+    @variable(dcglp, st[1:dim_t])
 
     @objective(dcglp, Min, tau)
 
     @constraint(dcglp, conx, dcglp[:omega_x][1, :] + dcglp[:omega_x][2, :] - sx .== 0)
-    @constraint(dcglp, cont[j = 1:master.dim_t], dcglp[:omega_t][1, j] + dcglp[:omega_t][2, j] - st[j] == 0)
+    @constraint(dcglp, cont[j = 1:dim_t], dcglp[:omega_t][1, j] + dcglp[:omega_t][2, j] - st[j] == 0)
 
     return dcglp, tau, sx, st
 end
@@ -277,11 +288,13 @@ function solve_dcglp!(
             )
             oracle.param.dcglp_param.verbose && print_disjunctive_cut(oracle, cut, x_value, t_value; zero_tol = oracle.param.zero_tol)
             store_dcglp_disjunctive_cut!(oracle, cut, hyperplanes)
-            return false, hyperplanes, fill(Inf, length(t_value))
+            return false, hyperplanes, fill(Inf, oracle.dim_auxiliary)
         end
 
         if all(log.iterations[end].is_in_L) # optimal termination with both points in the oracle feasible region
-            return true, [Hyperplane(length(x_value), length(t_value))], deepcopy(t_value)
+            return true,
+                   [Hyperplane(length(x_value), length(t_value))],
+                   deepcopy(t_value[oracle.auxiliary_indices])
         end
 
         # fallback to typical oracle since no meaningful disjunctive cut can be constructed from the DCGLP solution
@@ -345,13 +358,15 @@ function collect_dcglp_benders_cuts!(
         state.oracle_times[i] = @elapsed begin
             if state.values[:ω_0][i] >= oracle.param.zero_tol
                 t_prime = state.values[:ω_t][i] ./ state.values[:ω_0][i]
-                state.is_in_L[i], hyperplanes_i, state.f_x[i] = generate_cuts(
+                state.is_in_L[i], hyperplanes_i, local_f_x = generate_cuts(
                     oracle.typical_oracles[i],
                     clamp.(state.values[:ω_x][i] ./ state.values[:ω_0][i], 0.0, 1.0),
                     t_prime;
                     tol_normalize = state.values[:ω_0][i],
                     time_limit = get_sec_remaining(log.start_time, time_limit),
                 )
+                state.f_x[i] = copy(t_prime)
+                state.f_x[i][oracle.auxiliary_indices] = local_f_x
 
                 if !state.is_in_L[i]
                     for k in 1:2
