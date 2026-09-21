@@ -97,6 +97,10 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
             Float64[],
             Float64[],
         )
+        @test_throws BendersX.UnimplementedInterfaceException BendersX.add_cuts!(
+            master,
+            BendersX.Hyperplane[],
+        )
     end
 
     @testset "provided Master implements the public interface" begin

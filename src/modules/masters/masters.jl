@@ -16,7 +16,7 @@ Built-in BendersX environments currently require an `AbstractMaster` to be JuMP-
 function master_model(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`BendersX.master_model(master::$(typeof(master)))`.",
+        "`master_model(master::$(typeof(master)))`.",
     ))
 end
 
@@ -30,7 +30,7 @@ The returned order defines the correspondence with candidate linking-value vecto
 function linking_variables(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`BendersX.linking_variables(master::$(typeof(master)))`.",
+        "`linking_variables(master::$(typeof(master)))`.",
     ))
 end
 
@@ -44,7 +44,7 @@ The returned order defines the correspondence with oracle objective-value vector
 function auxiliary_variables(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`BendersX.auxiliary_variables(master::$(typeof(master)))`.",
+        "`auxiliary_variables(master::$(typeof(master)))`.",
     ))
 end
 
@@ -58,7 +58,7 @@ Flattening the returned `NamedTuple` with [`var_from_tuple`](@ref) must produce 
 function copy_linking_variables!(model::Model, master::AbstractMaster)
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`BendersX.copy_linking_variables!(model::Model, master::$(typeof(master)))`.",
+        "`copy_linking_variables!(model::Model, master::$(typeof(master)))`.",
     ))
 end
 
@@ -76,7 +76,7 @@ function evaluate_primal_objective(
 )
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`BendersX.evaluate_primal_objective(master::$(typeof(master)), " *
+        "`evaluate_primal_objective(master::$(typeof(master)), " *
         "linking_vars, auxiliary_vars)`.",
     ))
 end
@@ -86,17 +86,13 @@ end
 
 Add ordinary Benders cuts represented by `hyperplanes` to `master` and return the created constraint references.
 
-The default implementation converts the hyperplanes using the public master interface and adds them to the underlying JuMP model. A custom master may override this operation to record or manage cuts without requiring changes to the sequential environments.
+Every concrete `AbstractMaster` subtype used by a sequential environment must implement this method. Each implementation may add, record, or otherwise manage cuts as appropriate for its own representation.
 """
 function add_cuts!(master::AbstractMaster, hyperplanes::Vector{Hyperplane})
-    model = master_model(master)
-    cuts = hyperplanes_to_expression(
-        model,
-        hyperplanes,
-        linking_variables(master),
-        auxiliary_variables(master),
-    )
-    return @constraint(model, 0.0 .>= cuts)
+    throw(UnimplementedInterfaceException(
+        "AbstractMaster subtype $(typeof(master)) must implement " *
+        "`add_cuts!(master::$(typeof(master)), hyperplanes)`.",
+    ))
 end
 
 # -----------------------------------------------------------------------------

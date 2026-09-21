@@ -87,3 +87,14 @@ function evaluate_primal_objective(
     ))
     return dot(master.c_x, linking_vars) + dot(master.c_t, auxiliary_vars)
 end
+
+function add_cuts!(master::Master, hyperplanes::Vector{Hyperplane})
+    model = master_model(master)
+    cuts = hyperplanes_to_expression(
+        model,
+        hyperplanes,
+        linking_variables(master),
+        auxiliary_variables(master),
+    )
+    return @constraint(model, 0.0 .>= cuts)
+end
