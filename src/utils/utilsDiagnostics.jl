@@ -31,7 +31,7 @@ whether the candidate solution is feasible for the master problem.
 1. Converts the candidate values into a dictionary `opt_sol::Dict{VariableRef,Float64}`.
 2. Prints:
    - a primal feasibility report (`primal_feasibility_report`),
-   - the objective value returned by [`evaluate_primal_objective`](@ref).
+   - the objective value returned by [`evaluate_objective`](@ref).
 3. Fixes all master variables to the candidate values and re-solves the model.
 4. Prints the resulting objective value.
 
@@ -75,7 +75,7 @@ function infeasibility_report(master::AbstractMaster, linking_values, auxiliary_
     end
 
     @info primal_feasibility_report(model, opt_sol)
-    @info evaluate_primal_objective(master, linking_values, auxiliary_values)
+    @info evaluate_objective(master, linking_values, auxiliary_values)
 
     for v in keys(opt_sol)
         fix(v, opt_sol[v]; force=true)

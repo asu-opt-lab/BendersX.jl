@@ -125,7 +125,7 @@ mutable struct UnifiedOracle <: AbstractTypicalOracle
         set_optimizer_checked!(sub_model, optimizer, "UnifiedOracle subproblem model")
 
         # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-        x_copy = copy_linking_variables!(sub_model, master)
+        x_copy = copy_linking_variable_tuple!(sub_model, master)
 
         # Collect all copied master variables
         x = var_from_tuple(x_copy)

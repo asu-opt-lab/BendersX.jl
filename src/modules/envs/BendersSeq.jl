@@ -120,7 +120,7 @@ function solve!(env::BendersSeq; iter_prefix = "")
                             state,
                             log,
                             (auxiliary_values, linking_values) ->
-                                evaluate_primal_objective(
+                                evaluate_objective(
                                     env.master,
                                     linking_values,
                                     auxiliary_values,

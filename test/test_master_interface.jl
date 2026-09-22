@@ -40,10 +40,10 @@ end
 BendersX.master_model(master::RenamedFieldMaster) = master.jump_model
 BendersX.linking_variables(master::RenamedFieldMaster) = master.linking_vars
 BendersX.auxiliary_variables(master::RenamedFieldMaster) = master.auxiliary_vars
-BendersX.copy_linking_variables!(model::Model, master::RenamedFieldMaster) =
+BendersX.copy_linking_variable_tuple!(model::Model, master::RenamedFieldMaster) =
     BendersX.copy_variables!(model, master.linking_structure)
 
-function BendersX.evaluate_primal_objective(
+function BendersX.evaluate_objective(
     master::RenamedFieldMaster,
     linking_vars::AbstractVector{<:Real},
     auxiliary_vars::AbstractVector{<:Real},
@@ -91,8 +91,8 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         @test_throws BendersX.UnimplementedInterfaceException BendersX.master_model(master)
         @test_throws BendersX.UnimplementedInterfaceException BendersX.linking_variables(master)
         @test_throws BendersX.UnimplementedInterfaceException BendersX.auxiliary_variables(master)
-        @test_throws BendersX.UnimplementedInterfaceException BendersX.copy_linking_variables!(Model(), master)
-        @test_throws BendersX.UnimplementedInterfaceException BendersX.evaluate_primal_objective(
+        @test_throws BendersX.UnimplementedInterfaceException BendersX.copy_linking_variable_tuple!(Model(), master)
+        @test_throws BendersX.UnimplementedInterfaceException BendersX.evaluate_objective(
             master,
             Float64[],
             Float64[],
@@ -113,9 +113,9 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         @test BendersX.master_model(master) === master.model
         @test BendersX.linking_variables(master) === master.x
         @test BendersX.auxiliary_variables(master) === master.t
-        @test BendersX.evaluate_primal_objective(master, [0.5], [1.5]) == 2.0
-        @test_throws DimensionMismatch BendersX.evaluate_primal_objective(master, Float64[], [1.5])
-        @test_throws DimensionMismatch BendersX.evaluate_primal_objective(master, [0.5], Float64[])
+        @test BendersX.evaluate_objective(master, [0.5], [1.5]) == 2.0
+        @test_throws DimensionMismatch BendersX.evaluate_objective(master, Float64[], [1.5])
+        @test_throws DimensionMismatch BendersX.evaluate_objective(master, [0.5], Float64[])
         @test_throws DimensionMismatch BendersX.infeasibility_report(master, Float64[], [1.5])
         @test_throws DimensionMismatch BendersX.infeasibility_report(master, [0.5], Float64[])
     end
@@ -123,7 +123,7 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
     @testset "different field layout supports built-in components" begin
         master = renamed_field_master()
         copied_model = Model()
-        copied = BendersX.copy_linking_variables!(copied_model, master)
+        copied = BendersX.copy_linking_variable_tuple!(copied_model, master)
 
         @test fieldnames(RenamedFieldMaster) == (
             :jump_model,
@@ -136,7 +136,7 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         )
         @test keys(copied) == (:open,)
         @test length(BendersX.var_from_tuple(copied)) == 1
-        @test BendersX.evaluate_primal_objective(master, [0.5], [1.5]) == 2.0
+        @test BendersX.evaluate_objective(master, [0.5], [1.5]) == 2.0
 
         first_oracle = ClassicalOracle(
             MasterInterfaceTestData(),

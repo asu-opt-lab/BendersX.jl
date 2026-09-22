@@ -1,20 +1,18 @@
 """
     Master <: AbstractMaster
 
-Master problem used in Benders decomposition.
-
-`Master` stores the JuMP model, the first-stage decision variables `x`, the auxiliary variables `t`, and the corresponding objective coefficients used by the Benders algorithms.
+Provided [`AbstractMaster`](@ref) implementation that adds all Benders cuts supplied by oracles to the master problem.
 
 # Fields
 
 - `model::Model`: Underlying JuMP optimization model.
-- `x_tuple::NamedTuple`: Named tuple containing the master variables returned by the master-model builder.
-- `x::Vector{VariableRef}`: Flattened vector of master variables that link to the second-stage problems.
-- `t::Vector{VariableRef}`: Auxiliary variables associated with the second-stage value functions.
-- `dim_x::Int`: Dimension of `x`.
-- `dim_t::Int`: Dimension of `t`.
-- `c_x::Vector{Float64}`: Objective coefficients of `x`.
-- `c_t::Vector{Float64}`: Objective coefficients of `t`.
+- `x_tuple::NamedTuple`: Structured tuple containing the master variables returned by the master modeling function.
+- `x::Vector{VariableRef}`: Flattened vector of linking variables.
+- `t::Vector{VariableRef}`: Vector of auxiliary variables.
+- `dim_x::Int`: Number of linking variables.
+- `dim_t::Int`: Number of auxiliary variables.
+- `c_x::Vector{Float64}`: Objective coefficients of the linking variables.
+- `c_t::Vector{Float64}`: Objective coefficients of the auxiliary variables.
 
 # Constructor
 
@@ -24,12 +22,12 @@ Master problem used in Benders decomposition.
         optimizer = DEFAULT_OPTIMIZER,
     )
 
-Construct a Benders master problem from `data`.
+Construct a `Master` from `data` using the supplied master modeling function.
 
 # Arguments
 
-- `data`: Problem data used to formulate the master problem. Any Julia object is accepted.
-- `model`: Function that builds the master model.
+- `data`: Problem data used to formulate the master problem.
+- `model`: Function that builds the master model and returns the linking and auxiliary variables.
 - `optimizer`: JuMP-compatible optimizer constructor.
 """
 mutable struct Master <: AbstractMaster
@@ -69,20 +67,20 @@ end
 master_model(master::Master) = master.model
 linking_variables(master::Master) = master.x
 auxiliary_variables(master::Master) = master.t
-copy_linking_variables!(model::Model, master::Master) =
+copy_linking_variable_tuple!(model::Model, master::Master) =
     copy_variables!(model, master.x_tuple)
 
-function evaluate_primal_objective(
+function evaluate_objective(
     master::Master,
     linking_vars::AbstractVector{<:Real},
     auxiliary_vars::AbstractVector{<:Real},
 )
     length(linking_vars) == length(master.c_x) || throw(DimensionMismatch(
-        "evaluate_primal_objective: expected $(length(master.c_x)) linking " *
+        "evaluate_objective: expected $(length(master.c_x)) linking " *
         "values, got $(length(linking_vars)).",
     ))
     length(auxiliary_vars) == length(master.c_t) || throw(DimensionMismatch(
-        "evaluate_primal_objective: expected $(length(master.c_t)) auxiliary " *
+        "evaluate_objective: expected $(length(master.c_t)) auxiliary " *
         "values, got $(length(auxiliary_vars)).",
     ))
     return dot(master.c_x, linking_vars) + dot(master.c_t, auxiliary_vars)

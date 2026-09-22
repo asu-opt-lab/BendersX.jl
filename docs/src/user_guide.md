@@ -7,7 +7,9 @@ BendersX.jl decomposes the Benders decomposition algorithm into three core compo
 Each component has a well-defined responsibility and can be independently replaced or extended.
 
 ### Master
-The **Master** represents the master problem in a Benders decomposition and is responsible for proposing candidate solutions.
+The **Master** maintains the current master problem. It stores the optimization
+model, incorporates Benders cuts, and provides the linking and auxiliary
+variables used by the rest of the algorithm.
 
 Conceptually, the Master:
 - represents the current relaxation of the Benders reformulation
@@ -19,52 +21,50 @@ In BendersX.jl, the Master is:
 - owns a JuMP model defining the master problem, and
 - accepts newly generated Benders cuts during the solution process.
 
-#### Two kinds of master customization
+There are two ways to customize the Master:
 
-Supplying a new `update_master_model!` method changes the mathematical master formulation while retaining the package-provided `Master` implementation. This is the appropriate extension point for most new problem classes.
+- **Change the master formulation.** Define a new `update_master_model!` method
+  while retaining the provided `Master` implementation.
+- **Change the master implementation.** Define a new subtype of
+  `AbstractMaster` and implement its public interface.
 
-Defining a new subtype of `AbstractMaster` changes the implementation or master-side behavior itself. For example, a custom subtype may store its objects under different field names or override how generated cuts are added. These two extension mechanisms are independent.
+These two mechanisms are independent. A new master formulation does not
+require a new `AbstractMaster` implementation.
 
 ### Adding a New Master
 
-Built-in environments currently support JuMP-backed `AbstractMaster` implementations. A custom implementation provides the following public interface instead of reproducing the fields of `Master`:
+For most problems, users only need to define the master formulation through
+`update_master_model!` and use the provided `Master` implementation.
+
+A new `AbstractMaster` subtype is needed only when the master representation
+or master-side behavior itself should change. Custom implementations interact
+with the rest of BendersX through a small public interface:
+
+- `master_model` provides the underlying JuMP model;
+- `linking_variables` and `auxiliary_variables` provide the variables used by
+  the Benders algorithm;
+- `copy_linking_variable_tuple!` provides the structured linking variables
+  used to construct subproblem models;
+- `evaluate_objective` evaluates the original objective at supplied linking
+  and auxiliary values; and
+- `add_cuts!` incorporates generated Benders cuts into the master.
+
+A custom Master is therefore free to use its own internal representation. For
+example:
 
 ```julia
-using BendersX
-using JuMP
-using LinearAlgebra
-
 struct MyMaster <: AbstractMaster
     jump_model::JuMP.Model
-    linking_structure::NamedTuple
     linking_vars::Vector{JuMP.VariableRef}
     auxiliary_vars::Vector{JuMP.VariableRef}
-    linking_costs::Vector{Float64}
-    auxiliary_costs::Vector{Float64}
+    # additional fields
 end
 
 BendersX.master_model(master::MyMaster) = master.jump_model
 BendersX.linking_variables(master::MyMaster) = master.linking_vars
 BendersX.auxiliary_variables(master::MyMaster) = master.auxiliary_vars
 
-BendersX.copy_linking_variables!(model::JuMP.Model, master::MyMaster) =
-    BendersX.copy_variables!(model, master.linking_structure)
-
-BendersX.evaluate_primal_objective(master::MyMaster, linking_vars, auxiliary_vars) =
-    LinearAlgebra.dot(master.linking_costs, linking_vars) +
-    LinearAlgebra.dot(master.auxiliary_costs, auxiliary_vars)
-```
-
-The order returned by `linking_variables` must match candidate linking-value vectors and the `a_x` coefficients of `Hyperplane`. Likewise, the order returned by `auxiliary_variables` must match candidate auxiliary-value vectors, oracle objective-value vectors, and `a_t`. Flattening the `NamedTuple` returned by
-`copy_linking_variables!` must reproduce the same linking-variable order.
-
-`add_cuts!` has a default implementation based on these methods. A custom master may override it to record or manage ordinary Benders cuts. This hook does not implement a cut-retention policy by itself.
-
-Some components require additional capabilities from the underlying JuMP model:
-
-- `SplitOracle` can transfer only the supported linear master constraints into its DCGLP.
-- `LPRelaxationPreprocessing` requires master integrality constraints that JuMP can temporarily relax.
-- `BendersBnB` requires an optimizer supporting the configured lazy-constraint and user-cut callbacks.
+# Implement the remaining AbstractMaster interface as required.
 
 ### Oracle
 An **Oracle** encapsulates all procedures related to **cut generation** at a given separation point.

@@ -138,7 +138,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         set_optimizer_checked!(sub_model, optimizer, "ParetoOracle standard subproblem model")
 
         # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-        x_copy = copy_linking_variables!(sub_model, master)
+        x_copy = copy_linking_variable_tuple!(sub_model, master)
 
         # Collect all copied master variables
         x = var_from_tuple(x_copy)
@@ -162,7 +162,7 @@ mutable struct ParetoOracle <: AbstractTypicalOracle
         set_optimizer_checked!(pareto_model, optimizer, "ParetoOracle pareto subproblem model")
 
         # Copy master variables for pareto model
-        pareto_x_copy = copy_linking_variables!(pareto_model, master)
+        pareto_x_copy = copy_linking_variable_tuple!(pareto_model, master)
         pareto_x = var_from_tuple(pareto_x_copy)
 
         # Build pareto model structure

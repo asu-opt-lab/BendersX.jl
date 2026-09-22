@@ -9,9 +9,9 @@
 """
     master_model(master::AbstractMaster) -> Model
 
-Return the JuMP model owned by `master`.
+Return the JuMP model associated with `master`.
 
-Built-in BendersX environments currently require an `AbstractMaster` to be JuMP-backed. Custom master implementations should specialize this method when their model is stored under a different field name.
+The returned model is the JuMP model maintained by the Master and used by the surrounding Benders algorithm.
 """
 function master_model(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
@@ -25,7 +25,7 @@ end
 
 Return the master's linking variables in their global coefficient order.
 
-The returned order defines the correspondence with candidate linking-value vectors passed to oracles and with the `a_x` coefficients of [`Hyperplane`](@ref). The variables must belong to the model returned by `master_model(master)`.
+This order defines the correspondence with candidate linking-variable values passed to oracles and with the `a_x` coefficients of [`Hyperplane`](@ref). The variables must belong to the model returned by [`master_model`](@ref).
 """
 function linking_variables(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
@@ -39,7 +39,7 @@ end
 
 Return the master's auxiliary variables in their global coefficient order.
 
-The returned order defines the correspondence with oracle objective-value vectors, candidate auxiliary-value vectors, and the `a_t` coefficients of [`Hyperplane`](@ref). The variables must belong to the model returned by `master_model(master)`.
+This order defines the correspondence with candidate auxiliary-variable values, oracle objective values, and the `a_t` coefficients of [`Hyperplane`](@ref). The variables must belong to the model returned by [`master_model`](@ref).
 """
 function auxiliary_variables(master::AbstractMaster)
     throw(UnimplementedInterfaceException(
@@ -49,34 +49,41 @@ function auxiliary_variables(master::AbstractMaster)
 end
 
 """
-    copy_linking_variables!(model::Model, master::AbstractMaster) -> NamedTuple
+    copy_linking_variable_tuple!(
+        model::Model,
+        master::AbstractMaster,
+    ) -> NamedTuple
 
-Create copies of the master's linking variables in `model`, preserving the names, axes, and container structure expected by a subproblem model builder.
+Copy the master's linking variables into `model` and return them as the `NamedTuple` used by the subproblem modeling interface.
 
-Flattening the returned `NamedTuple` with [`var_from_tuple`](@ref) must produce the same variable order as `linking_variables(master)`. This operation-oriented interface lets a custom master choose its own internal representation without exposing a field equivalent to `Master.x_tuple`.
+The returned variables preserve the names, axes, and container structure provided by the master modeling function and are passed as keyword arguments to the subproblem modeling function. The returned `NamedTuple` can be flattened with [`var_from_tuple`](@ref) when a vector of the copied linking variables is needed.
 """
-function copy_linking_variables!(model::Model, master::AbstractMaster)
+function copy_linking_variable_tuple!(model::Model, master::AbstractMaster)
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`copy_linking_variables!(model::Model, master::$(typeof(master)))`.",
+        "`copy_linking_variable_tuple!(model::Model, master::$(typeof(master)))`.",
     ))
 end
 
 """
-    evaluate_primal_objective(master::AbstractMaster, linking_vars, auxiliary_vars)
+    evaluate_objective(
+        master::AbstractMaster,
+        linking_vars,
+        auxiliary_vars,
+    )
 
-Evaluate the original problem objective at feasible values `linking_vars` for the linking variables and their true auxiliary values `auxiliary_vars`.
+Evaluate the original problem objective at the supplied values of the linking and auxiliary variables.
 
-Sequential environments use this operation to update the primal bound. It is a behavioral interface so custom master implementations are not required to store objective coefficients in fields equivalent to `Master.c_x` and `Master.c_t`.
+The supplied vectors must follow the orders returned by [`linking_variables`](@ref) and [`auxiliary_variables`](@ref), respectively.
 """
-function evaluate_primal_objective(
+function evaluate_objective(
     master::AbstractMaster,
     linking_vars::AbstractVector{<:Real},
     auxiliary_vars::AbstractVector{<:Real},
 )
     throw(UnimplementedInterfaceException(
         "AbstractMaster subtype $(typeof(master)) must implement " *
-        "`evaluate_primal_objective(master::$(typeof(master)), " *
+        "`evaluate_objective(master::$(typeof(master)), " *
         "linking_vars, auxiliary_vars)`.",
     ))
 end
@@ -84,9 +91,9 @@ end
 """
     add_cuts!(master::AbstractMaster, hyperplanes::Vector{Hyperplane})
 
-Add ordinary Benders cuts represented by `hyperplanes` to `master` and return the created constraint references.
+Add the supplied Benders cuts to `master` and return the resulting constraint references.
 
-Every concrete `AbstractMaster` subtype used by a sequential environment must implement this method. Each implementation may add, record, or otherwise manage cuts as appropriate for its own representation.
+Each `AbstractMaster` implementation defines how cuts are incorporated into its master model.
 """
 function add_cuts!(master::AbstractMaster, hyperplanes::Vector{Hyperplane})
     throw(UnimplementedInterfaceException(
