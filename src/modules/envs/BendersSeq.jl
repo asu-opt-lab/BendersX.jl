@@ -140,14 +140,14 @@ function solve!(env::BendersSeq; iter_prefix = "")
             add_cuts!(env.master, hyperplanes)
         end
         env.termination_status = Optimal()
-        env.obj_value = log.iterations[end].LB
+        env.obj_value = log.iterations[end].UB
         
         return to_dataframe(log)
     catch e
         if e isa TimeLimitException
             @warn e.msg
             env.termination_status = TimeLimit()
-            env.obj_value = isempty(log.iterations) ? Inf : log.iterations[end].LB
+            env.obj_value = isempty(log.iterations) ? Inf : log.iterations[end].UB
         elseif e isa UnexpectedModelStatusException
             @warn e.msg
             env.termination_status = InfeasibleOrNumericalIssue()

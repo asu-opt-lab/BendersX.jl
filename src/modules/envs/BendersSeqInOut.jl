@@ -133,23 +133,41 @@ function solve!(env::BendersSeqInOut)
 
                 # Execute oracle
                 state.oracle_time = @elapsed begin
-                    state.is_in_L, hyperplanes, state.f_x = generate_cuts(env.oracle, intermediate_x, state.values[:t]; time_limit = get_sec_remaining(log, param))
+                    intermediate_is_in_L, hyperplanes, state.f_x = generate_cuts(env.oracle, intermediate_x, state.values[:t]; time_limit = get_sec_remaining(log, param))
 
-                    if kelley_mode 
-                        if all(isfinite, state.f_x)
-                            update_upper_bound_and_gap!(
-                                state,
-                                log,
-                                (auxiliary_values, linking_values) ->
-                                    evaluate_objective(
-                                        env.master,
-                                        linking_values,
-                                        auxiliary_values,
-                                    ),
-                            )
+                    # In in-out mode, continue moving the query point toward the candidate
+                    # until it leaves L or Kelley mode is reached.
+                    if intermediate_is_in_L && !kelley_mode
+                        while λ < 1.0
+                            λ = min(λ + 0.1, 1.0)
+                            intermediate_x = λ * state.values[:x] + (1 - λ) * stabilizing_x
+                            param.verbose && println("Current intermediate point is in L, making it closer to the candidate point (λ = $λ).")
+    
+                            intermediate_is_in_L, hyperplanes, state.f_x = generate_cuts(env.oracle, intermediate_x, state.values[:t]; time_limit = get_sec_remaining(log, param))
+    
+                            intermediate_is_in_L || break
+
+                            if λ == 1.0
+                                kelley_mode = true
+                                param.verbose && println("Switching to Kelley's cutting plane method (λ = 1.0)")
+                            end
                         end
-                    else
-                        state.is_in_L = false
+                    end
+
+                    state.is_in_L = kelley_mode && intermediate_is_in_L
+
+                    if kelley_mode && all(isfinite, state.f_x)
+                        # In Kelley mode, intermediate_x is the candidate point.
+                        update_upper_bound_and_gap!(
+                            state,
+                            log,
+                            (auxiliary_values, linking_values) ->
+                                evaluate_objective(
+                                    env.master,
+                                    linking_values,
+                                    auxiliary_values,
+                                ),
+                        )
                     end
                 end
             
@@ -165,8 +183,8 @@ function solve!(env::BendersSeqInOut)
             # add generated cuts to master
             add_cuts!(env.master, hyperplanes)
             
-            # whether to switch kelley mode
-            if !kelley_mode && log.n_iter != 0
+            # whether to switch kelley mode due to slow progress
+            if !kelley_mode
                 check_lb_improvement!(state, log; zero_tol = 1e-8, tol_imprv = 5e-4)
 
                 if log.consecutive_no_improvement >= 5
@@ -178,14 +196,14 @@ function solve!(env::BendersSeqInOut)
             end
         end
         env.termination_status = Optimal()
-        env.obj_value = log.iterations[end].LB
+        env.obj_value = log.iterations[end].UB
         
         return to_dataframe(log)
     catch e
         if e isa TimeLimitException
             @warn e.msg
             env.termination_status = TimeLimit()
-            env.obj_value = isempty(log.iterations) ? Inf : log.iterations[end].LB
+            env.obj_value = isempty(log.iterations) ? Inf : log.iterations[end].UB
         elseif e isa UnexpectedModelStatusException
             @warn e.msg
             env.termination_status = InfeasibleOrNumericalIssue()

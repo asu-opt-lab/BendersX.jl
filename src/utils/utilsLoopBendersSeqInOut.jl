@@ -43,6 +43,15 @@ mutable struct BendersSeqInOutParam <: AbstractBendersSeqParam
                         λ::Float64 = 0.1
                         ) 
         
+        0.0 <= α <= 1.0 || throw(ArgumentError(
+            "BendersSeqInOutParam: α must be between 0 and 1; got $α.",
+        ))
+
+        0.0 <= λ <= 1.0 || throw(ArgumentError(
+            "BendersSeqInOutParam: λ must be between 0 and 1; got $λ.",
+        ))
+
+        
         new(time_limit, gap_tolerance, halt_limit, iter_limit, verbose, stabilizing_x, α, λ)
     end
 end
