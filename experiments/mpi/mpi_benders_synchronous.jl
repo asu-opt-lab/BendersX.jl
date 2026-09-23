@@ -1,11 +1,3 @@
-# Note: 
-# GLPK raises memory error when nthreads > 1. 
-# GLPK does not provide MOI.RelativeGapTolerance()
-# SeparableOracle:
-#     one component -> one or more subproblems
-
-# MPI partition:
-#     one process -> a flat set of assigned subproblems
 """
     mpi_benders_synchronous.jl
 
@@ -138,6 +130,7 @@ if rank == ROOT
             tag = TAG_PARTITION,
         )
     end
+    subproblem_indices = partitions[1]
 else
     subproblem_indices = MPI.recv(
         COMM;
@@ -148,10 +141,7 @@ end
 
 MPI.Barrier(COMM)
 
-if rank == ROOT
-    subproblem_indices = partitions[1]
-end
-
+# Display worker ownership in rank order.
 for r in 0:(nranks - 1)
     MPI.Barrier(COMM)
     if rank == r
@@ -369,7 +359,7 @@ function serve_worker!(local_oracle::SeparableOracle, comm::MPI.Comm; root = ROO
                 tag = TAG_RESULT,
             )
         else
-            throw(ArgumentError("Unknown command received by worker."))
+            throw(ArgumentError("Unknown MPI worker command: $command"))
         end
     end
 end
