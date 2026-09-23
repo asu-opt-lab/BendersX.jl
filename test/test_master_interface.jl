@@ -131,6 +131,8 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         @test keys(copied) == (:open,)
         @test length(BendersX.var_from_tuple(copied)) == 1
         @test BendersX.evaluate_objective(master, [0.5], [1.5]) == 2.0
+        @test_throws DimensionMismatch BendersX.infeasibility_report(master, Float64[], [1.5])
+        @test_throws DimensionMismatch BendersX.infeasibility_report(master, [0.5], Float64[])
 
         first_oracle = ClassicalOracle(
             MasterInterfaceTestData(),

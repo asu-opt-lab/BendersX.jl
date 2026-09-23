@@ -16,8 +16,8 @@ Conceptually, the Master:
 - refines this relaxation by incorporating newly generated Benders cuts, and
 - produces candidate solutions for evaluation.
 
-In BendersX.jl, the Master is:
-- encapsulated by a subtype of `AbstractMaster`
+In BendersX.jl, the Master:
+- is encapsulated by a subtype of `AbstractMaster`
 - owns a JuMP model defining the master problem, and
 - accepts newly generated Benders cuts during the solution process.
 
