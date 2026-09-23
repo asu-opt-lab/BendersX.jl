@@ -139,41 +139,42 @@ function solve!(env::BendersBnB)
     try 
         # Apply preprocessing
         log.preprocessing_time = preprocess!(env.master, env.preprocessing; time_limit = get_sec_remaining(log, param))
+        model = master_model(env.master)
 
         # Set up lazy callback
         function lazy_callback_wrapper(cb_data)
             lazy_callback(cb_data, env.master, log, env.param, env.lazy_callback)
         end
-        set_attribute(env.master.model, MOI.LazyConstraintCallback(), lazy_callback_wrapper)
+        set_attribute(model, MOI.LazyConstraintCallback(), lazy_callback_wrapper)
         
         # Set up user callback if specified
         if !isa(env.user_callback, NoUserCallback)
             function user_callback_wrapper(cb_data)
                 user_callback(cb_data, env.master, log, env.param, env.user_callback)
             end
-            set_attribute(env.master.model, MOI.UserCutCallback(), user_callback_wrapper)
+            set_attribute(model, MOI.UserCutCallback(), user_callback_wrapper)
         end
         
         get_sec_remaining(log, param) <= 0.0 && throw(TimeLimitException("BendersBnB: Time limit reached before initiating branch-and-bound procedure."))
 
         # Configure solver parameters
-        set_time_limit_sec(env.master.model, get_sec_remaining(log, param))
-        set_optimizer_attribute(env.master.model, MOI.Silent(), !param.verbose)
-        set_optimizer_attribute(env.master.model, MOI.RelativeGapTolerance(), param.gap_tolerance)
+        set_time_limit_sec(model, get_sec_remaining(log, param))
+        set_optimizer_attribute(model, MOI.Silent(), !param.verbose)
+        set_optimizer_attribute(model, MOI.RelativeGapTolerance(), param.gap_tolerance)
         
         # Solve the master problem
-        JuMP.optimize!(env.master.model)
+        JuMP.optimize!(model)
         
         log.total_time = time() - log.start_time
 
         # Process termination status
-        status = termination_status(env.master.model)
+        status = termination_status(model)
         if status == MOI.OPTIMAL
             env.termination_status = Optimal()
-            env.obj_value = JuMP.objective_value(env.master.model)
+            env.obj_value = JuMP.objective_value(model)
         elseif status == MOI.TIME_LIMIT
             env.termination_status = TimeLimit()
-            env.obj_value = has_values(env.master.model) ? JuMP.objective_value(env.master.model) : Inf
+            env.obj_value = has_values(model) ? JuMP.objective_value(model) : Inf
         else
             throw(UnexpectedModelStatusException("BendersBnB: master $(status)"))
         end
@@ -189,7 +190,8 @@ function solve!(env::BendersBnB)
         if e isa TimeLimitException
             @warn e.msg
             env.termination_status = TimeLimit()
-            env.obj_value = has_values(env.master.model) ? JuMP.objective_value(env.master.model) : Inf
+            model = master_model(env.master)
+            env.obj_value = has_values(model) ? JuMP.objective_value(model) : Inf
         elseif e isa UnexpectedModelStatusException
             @warn e.msg
             env.termination_status = InfeasibleOrNumericalIssue()

@@ -23,7 +23,7 @@ end
 """
     UFLKnapsackOracle(
         data::SUFLPData,
-        master::Master;
+        master::AbstractMaster;
         subproblem_idx,
         param = UFLKnapsackOracleParam(),
         ...,

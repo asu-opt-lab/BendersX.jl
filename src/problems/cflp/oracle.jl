@@ -41,7 +41,7 @@ mutable struct CFLKnapsackOracle <: AbstractTypicalOracle
     gbc_rhs::Vector{Union{VariableRef, AffExpr}}
     gbc_sense::Vector{GBCBoundType}
     
-    function CFLKnapsackOracle(data, master::Master;
+    function CFLKnapsackOracle(data, master::AbstractMaster;
                             model = update_sub_model!,
                             subproblem_idx::Int=-1,
                             param::CFLKnapsackOracleParam = CFLKnapsackOracleParam(),
@@ -51,7 +51,7 @@ mutable struct CFLKnapsackOracle <: AbstractTypicalOracle
         set_optimizer_checked!(sub_model, optimizer, "CFLKnapsackOracle subproblem model")
 
         # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-        x_copy = copy_variables!(sub_model, master.x_tuple)
+        x_copy = copy_linking_variable_tuple!(sub_model, master)
 
         # Collect all copied master variables and add linking constraint
         x = var_from_tuple(x_copy)

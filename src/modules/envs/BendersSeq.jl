@@ -86,6 +86,9 @@ function solve!(env::BendersSeq; iter_prefix = "")
     try    
         # Apply preprocessing
         log.preprocessing_time = preprocess!(env.master, env.preprocessing; time_limit = get_sec_remaining(log, param))
+        model = master_model(env.master)
+        linking_vars = linking_variables(env.master)
+        auxiliary_vars = auxiliary_variables(env.master)
         
         while true
 
@@ -95,27 +98,34 @@ function solve!(env::BendersSeq; iter_prefix = "")
             state.total_time = @elapsed begin
                 # Solve master problem
                 state.master_time = @elapsed begin
-                    set_time_limit_sec(env.master.model, get_sec_remaining(log, param))
-                    optimize!(env.master.model)
-                    if is_solved_and_feasible(env.master.model; allow_local = false, dual = false)
-                        state.LB = JuMP.objective_value(env.master.model)
-                        state.values[:x] = JuMP.value.(env.master.x)
-                        state.values[:t] = JuMP.value.(env.master.t)
-                    elseif termination_status(env.master.model) == TIME_LIMIT
+                    set_time_limit_sec(model, get_sec_remaining(log, param))
+                    optimize!(model)
+                    if is_solved_and_feasible(model; allow_local = false, dual = false)
+                        state.LB = JuMP.objective_value(model)
+                        state.values[:x] = JuMP.value.(linking_vars)
+                        state.values[:t] = JuMP.value.(auxiliary_vars)
+                    elseif termination_status(model) == TIME_LIMIT
                         throw(TimeLimitException("BendersSeq: Time limit reached during master solving"))
                     else
-                        throw(UnexpectedModelStatusException("BendersSeq: master $(termination_status(env.master.model))"))
+                        throw(UnexpectedModelStatusException("BendersSeq: master $(termination_status(model))"))
                     end
                 end
                 
                 # Execute oracle
                 state.oracle_time = @elapsed begin
                     state.is_in_L, hyperplanes, state.f_x = generate_cuts(env.oracle, state.values[:x], state.values[:t]; time_limit = get_sec_remaining(log, param))
-                    
-                    cuts = !state.is_in_L ? hyperplanes_to_expression(env.master.model, hyperplanes, env.master.x, env.master.t) : []
                 
                     if all(isfinite, state.f_x)
-                        update_upper_bound_and_gap!(state, log, (f_x, x) -> env.master.c_t' * f_x + env.master.c_x' * x)
+                        update_upper_bound_and_gap!(
+                            state,
+                            log,
+                            (auxiliary_values, linking_values) ->
+                                evaluate_objective(
+                                    env.master,
+                                    linking_values,
+                                    auxiliary_values,
+                                ),
+                        )
                     end
                 end
 
@@ -127,7 +137,7 @@ function solve!(env::BendersSeq; iter_prefix = "")
             is_terminated(state, log, param) && break
 
             # Add generated cuts to master
-            @constraint(env.master.model, 0.0 .>= cuts)
+            add_cuts!(env.master, hyperplanes)
         end
         env.termination_status = Optimal()
         env.obj_value = log.iterations[end].LB

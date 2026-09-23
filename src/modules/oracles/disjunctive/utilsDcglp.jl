@@ -56,22 +56,26 @@ function build_dcglp_base(
     dim_t::Int,
 )
     dim_t > 0 || throw(ArgumentError("build_dcglp_base: `dim_t` must be positive."))
+    source_model = master_model(master)
+    linking_vars = linking_variables(master)
+    num_linking_vars = length(linking_vars)
+
     dcglp = Model(param.dcglp_param.optimizer)
     @variable(dcglp, omega_0[1:2] >= 0)
 
-    @variable(dcglp, omega_x[1:2, 1:master.dim_x])
+    @variable(dcglp, omega_x[1:2, 1:num_linking_vars])
     @variable(dcglp, omega_t[1:2, 1:dim_t])
 
     @constraint(dcglp, [i in 1:2], omega_t[i, :] .>= -1.0e6 .* omega_0[i])
-    @constraint(dcglp, coneta[i in 1:2, j in 1:master.dim_x], 0 >= -omega_0[i] + omega_x[i, j])
-    @constraint(dcglp, condelta[i in 1:2, j in 1:master.dim_x], 0 >= -omega_x[i, j])
+    @constraint(dcglp, coneta[i in 1:2, j in 1:num_linking_vars], 0 >= -omega_0[i] + omega_x[i, j])
+    @constraint(dcglp, condelta[i in 1:2, j in 1:num_linking_vars], 0 >= -omega_x[i, j])
 
     @constraint(dcglp, con0, omega_0[1] + omega_0[2] == 1)
 
     for i in 1:2
         transfer_scaled_linear_rows_and_bounds_with_types!(
-            master.model,
-            master.x,
+            source_model,
+            linking_vars,
             dcglp,
             omega_x[i, :],
             omega_0[i],
@@ -79,7 +83,7 @@ function build_dcglp_base(
     end
 
     @variable(dcglp, tau)
-    @variable(dcglp, sx[1:master.dim_x])
+    @variable(dcglp, sx[1:num_linking_vars])
     @variable(dcglp, st[1:dim_t])
 
     @objective(dcglp, Min, tau)

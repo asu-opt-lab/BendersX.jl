@@ -4,6 +4,7 @@ using BendersX
 @testset "BendersX.jl" begin
     include("test_public_api.jl")
     include("test_solver_extensions.jl")
+    include("test_master_interface.jl")
     include("test_callback_metadata.jl")
     include("test_preprocessing.jl")
     include("test_disjunctive_norm_oracles.jl")

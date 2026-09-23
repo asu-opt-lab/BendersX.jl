@@ -39,6 +39,8 @@ using BendersX
         :AbstractBendersBnBState, :AbstractBendersBnBLog, :AbstractBendersBnBParam,
         :SplitIndexSelectionRule, :DisjunctiveCutsAppendRule,
         :generate_cuts, :auxiliary_dimension,
+        :master_model, :linking_variables, :auxiliary_variables,
+        :copy_linking_variable_tuple!, :evaluate_objective, :add_cuts!,
         :add_normalization_constraint!, :update_dcglp_upper_bound_and_gap!,
         :disjunctive_cut_normalization_value, :Hyperplane, :aggregate, :evaluate_violation,
         :select_top_fraction, :hyperplanes_to_expression, :add_constraints,

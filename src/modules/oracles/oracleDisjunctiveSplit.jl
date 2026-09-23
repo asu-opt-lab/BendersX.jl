@@ -158,6 +158,9 @@ mutable struct SplitOracle{
         T1 <: AbstractOracle,
         T2 <: AbstractOracle,
     }
+        dim_global_auxiliary = length(auxiliary_variables(master))
+        dim_linking = length(linking_variables(master))
+
         all(is_typical_oracle, typical_oracles) || throw(
             ArgumentError(
                 "SplitOracle: both supplied oracles must be typical oracles."
@@ -214,35 +217,35 @@ mutable struct SplitOracle{
                 ),
             )
 
-            first_oracle.dim_global_auxiliary == master.dim_t || throw(
+            first_oracle.dim_global_auxiliary == dim_global_auxiliary || throw(
                 DimensionMismatch(
                     "SplitOracle: the typical SeparableOracle's global auxiliary dimension " *
                     "$(first_oracle.dim_global_auxiliary) must equal " *
-                    "master.dim_t ($(master.dim_t)).",
+                    "the master auxiliary dimension ($(dim_global_auxiliary)).",
                 ),
             )
 
             auxiliary_indices = vcat(first_oracle.auxiliary_indices...)
         else
-            dim_auxiliary == master.dim_t || throw(
+            dim_auxiliary == dim_global_auxiliary || throw(
                 DimensionMismatch(
                     "SplitOracle: each typical oracle must represent the full auxiliary " *
                     "space when the typical oracles are not SeparableOracles; expected " *
-                    "auxiliary dimension $(master.dim_t), got $dim_auxiliary.",
+                    "auxiliary dimension $(dim_global_auxiliary), got $dim_auxiliary.",
                 ),
             )
 
-            auxiliary_indices = collect(1:master.dim_t)
+            auxiliary_indices = collect(1:dim_global_auxiliary)
         end
         dcglp = build_dcglp(
             master,
             normalization,
             param;
-            dim_t = master.dim_t,
+            dim_t = dim_global_auxiliary,
         )
 
         disjunctive_cuts_by_index = [
-            Hyperplane[] for _ in 1:master.dim_x
+            Hyperplane[] for _ in 1:dim_linking
         ]
         disjunctive_cuts = Hyperplane[]
         splits = Tuple{SparseVector{Float64,Int},Float64}[]

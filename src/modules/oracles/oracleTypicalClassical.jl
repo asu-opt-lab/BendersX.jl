@@ -30,7 +30,7 @@ The user supplies the subproblem through a model-update function. To use general
 
     ClassicalOracle(
         data,
-        master::Master;
+        master::AbstractMaster;
         model = update_sub_model!,
         subproblem_idx::Int = 0,
         param::ClassicalOracleParam = ClassicalOracleParam(),
@@ -55,7 +55,7 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
     gbc_sense::Vector{GBCBoundType}
 
 
-    function ClassicalOracle(data, master::Master;
+    function ClassicalOracle(data, master::AbstractMaster;
                             model = update_sub_model!,
                             subproblem_idx::Int=0,
                             param::ClassicalOracleParam = ClassicalOracleParam(),
@@ -66,7 +66,7 @@ mutable struct ClassicalOracle <: AbstractTypicalOracle
             set_optimizer_checked!(sub_model, optimizer, "ClassicalOracle subproblem model")
 
             # Copy the master's coupling variables into the submodel (with identical axes and symbols)
-            x_copy = copy_variables!(sub_model, master.x_tuple)
+            x_copy = copy_linking_variable_tuple!(sub_model, master)
 
             # Collect all copied master variables and add linking constraint
             x = var_from_tuple(x_copy)

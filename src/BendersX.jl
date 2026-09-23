@@ -54,6 +54,8 @@ public AbstractBendersSeqState, AbstractBendersSeqLog, AbstractBendersSeqParam
 public AbstractBendersBnBState, AbstractBendersBnBLog, AbstractBendersBnBParam
 public SplitIndexSelectionRule, DisjunctiveCutsAppendRule
 public generate_cuts, auxiliary_dimension
+public master_model, linking_variables, auxiliary_variables
+public copy_linking_variable_tuple!, evaluate_objective, add_cuts!
 public add_normalization_constraint!, update_dcglp_upper_bound_and_gap!
 public disjunctive_cut_normalization_value
 public callback_node_count, callback_node_depth
