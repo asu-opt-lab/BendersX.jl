@@ -96,3 +96,51 @@ function add_cuts!(master::Master, hyperplanes::Vector{Hyperplane})
     )
     return @constraint(model, 0.0 .>= cuts)
 end
+
+"""
+    infeasibility_report(master::Master, linking_values, auxiliary_values)
+
+Generate and display an infeasibility and consistency report for a candidate
+solution of the provided [`Master`](@ref) implementation.
+
+The candidate values must follow the orders returned by
+[`linking_variables`](@ref) and [`auxiliary_variables`](@ref). The report shows
+the primal feasibility of the candidate, its value under
+[`evaluate_objective`](@ref), and the objective obtained after fixing the
+master variables to the candidate and resolving the model.
+
+This diagnostic mutates the master model by fixing its variables, solves the
+model once, and writes its results through `@info`.
+"""
+function infeasibility_report(master::Master, linking_values, auxiliary_values)
+    model = master_model(master)
+    linking_vars = linking_variables(master)
+    auxiliary_vars = auxiliary_variables(master)
+
+    length(linking_values) == length(linking_vars) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(linking_vars)) linking values, " *
+        "got $(length(linking_values)).",
+    ))
+    length(auxiliary_values) == length(auxiliary_vars) || throw(DimensionMismatch(
+        "infeasibility_report: expected $(length(auxiliary_vars)) auxiliary values, " *
+        "got $(length(auxiliary_values)).",
+    ))
+
+    opt_sol = Dict{VariableRef, Float64}()
+    for i in eachindex(linking_vars)
+        opt_sol[linking_vars[i]] = linking_values[i]
+    end
+    for i in eachindex(auxiliary_vars)
+        opt_sol[auxiliary_vars[i]] = auxiliary_values[i]
+    end
+
+    @info primal_feasibility_report(model, opt_sol)
+    @info evaluate_objective(master, linking_values, auxiliary_values)
+
+    for variable in keys(opt_sol)
+        fix(variable, opt_sol[variable]; force = true)
+    end
+    optimize!(model)
+    @info objective_value(model)
+    return nothing
+end

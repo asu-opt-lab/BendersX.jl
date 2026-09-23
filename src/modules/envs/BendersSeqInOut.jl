@@ -163,7 +163,7 @@ function solve!(env::BendersSeqInOut)
             is_terminated(state, log, param) && break
 
             # add generated cuts to master
-            !state.is_in_L && add_cuts!(env.master, hyperplanes)
+            add_cuts!(env.master, hyperplanes)
             
             # whether to switch kelley mode
             if !kelley_mode && log.n_iter != 0

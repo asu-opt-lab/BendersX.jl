@@ -137,7 +137,7 @@ function solve!(env::BendersSeq; iter_prefix = "")
             is_terminated(state, log, param) && break
 
             # Add generated cuts to master
-            !state.is_in_L && add_cuts!(env.master, hyperplanes)
+            add_cuts!(env.master, hyperplanes)
         end
         env.termination_status = Optimal()
         env.obj_value = log.iterations[end].LB

@@ -17,7 +17,7 @@ Conceptually, the Master:
 - produces candidate solutions for evaluation.
 
 In BendersX.jl, the Master is:
-- is encapsulated by a subtype of `AbstractMaster`
+- encapsulated by a subtype of `AbstractMaster`
 - owns a JuMP model defining the master problem, and
 - accepts newly generated Benders cuts during the solution process.
 
@@ -30,41 +30,6 @@ There are two ways to customize the Master:
 
 These two mechanisms are independent. A new master formulation does not
 require a new `AbstractMaster` implementation.
-
-### Adding a New Master
-
-For most problems, users only need to define the master formulation through
-`update_master_model!` and use the provided `Master` implementation.
-
-A new `AbstractMaster` subtype is needed only when the master representation
-or master-side behavior itself should change. Custom implementations interact
-with the rest of BendersX through a small public interface:
-
-- `master_model` provides the underlying JuMP model;
-- `linking_variables` and `auxiliary_variables` provide the variables used by
-  the Benders algorithm;
-- `copy_linking_variable_tuple!` provides the structured linking variables
-  used to construct subproblem models;
-- `evaluate_objective` evaluates the original objective at supplied linking
-  and auxiliary values; and
-- `add_cuts!` incorporates generated Benders cuts into the master.
-
-A custom Master is therefore free to use its own internal representation. For
-example:
-
-```julia
-struct MyMaster <: AbstractMaster
-    jump_model::JuMP.Model
-    linking_vars::Vector{JuMP.VariableRef}
-    auxiliary_vars::Vector{JuMP.VariableRef}
-    # additional fields
-end
-
-BendersX.master_model(master::MyMaster) = master.jump_model
-BendersX.linking_variables(master::MyMaster) = master.linking_vars
-BendersX.auxiliary_variables(master::MyMaster) = master.auxiliary_vars
-
-# Implement the remaining AbstractMaster interface as required.
 
 ### Oracle
 An **Oracle** encapsulates all procedures related to **cut generation** at a given separation point.
@@ -102,6 +67,42 @@ Each component follows a clear type hierarchy that supports specialization and r
 
 ### Oracle
 ![dd](OracleHierarchy.pdf)
+
+## Adding a New Master
+
+For most problems, users only need to define the master formulation through
+`update_master_model!` and use the provided `Master` implementation.
+
+A new `AbstractMaster` subtype is needed only when the master representation
+or master-side behavior itself should change. Custom implementations interact
+with the rest of BendersX through a small public interface:
+
+- `master_model` provides the underlying JuMP model;
+- `linking_variables` and `auxiliary_variables` provide the variables used by
+  the Benders algorithm;
+- `copy_linking_variable_tuple!` provides the structured linking variables
+  used to construct subproblem models;
+- `evaluate_objective` evaluates the original objective at supplied linking
+  and auxiliary values; and
+- `add_cuts!` incorporates generated Benders cuts into the master.
+
+A custom Master is therefore free to use its own internal representation. For
+example:
+
+```julia
+struct MyMaster <: AbstractMaster
+    jump_model::JuMP.Model
+    linking_vars::Vector{JuMP.VariableRef}
+    auxiliary_vars::Vector{JuMP.VariableRef}
+    # additional fields
+end
+
+BendersX.master_model(master::MyMaster) = master.jump_model
+BendersX.linking_variables(master::MyMaster) = master.linking_vars
+BendersX.auxiliary_variables(master::MyMaster) = master.auxiliary_vars
+
+# Implement the remaining AbstractMaster interface as required.
+```
 
 ## Adding New Oracles
 Advanced users can implement custom cut generators by defining a new oracle:

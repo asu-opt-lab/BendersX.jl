@@ -3,6 +3,9 @@ using JuMP
 using GLPK
 using LinearAlgebra
 
+const MASTER_INTERFACE_CPLEX_AVAILABLE = !isnothing(Base.find_package("CPLEX"))
+MASTER_INTERFACE_CPLEX_AVAILABLE && @eval using CPLEX
+
 struct MasterInterfaceTestData end
 
 function build_master_interface_test_model!(model::Model, ::MasterInterfaceTestData)
@@ -66,11 +69,11 @@ function BendersX.add_cuts!(
     return @constraint(master.jump_model, 0.0 .>= cuts)
 end
 
-function renamed_field_master()
+function renamed_field_master(; optimizer = GLPK.Optimizer)
     provided = Master(
         MasterInterfaceTestData();
         model = build_master_interface_test_model!,
-        optimizer = GLPK.Optimizer,
+        optimizer = optimizer,
     )
     return RenamedFieldMaster(
         provided.model,
@@ -125,15 +128,6 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         copied_model = Model()
         copied = BendersX.copy_linking_variable_tuple!(copied_model, master)
 
-        @test fieldnames(RenamedFieldMaster) == (
-            :jump_model,
-            :linking_structure,
-            :linking_vars,
-            :auxiliary_vars,
-            :linking_costs,
-            :auxiliary_costs,
-            :cut_batches,
-        )
         @test keys(copied) == (:open,)
         @test length(BendersX.var_from_tuple(copied)) == 1
         @test BendersX.evaluate_objective(master, [0.5], [1.5]) == 2.0
@@ -164,8 +158,27 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
             optimizer = GLPK.Optimizer,
         )
 
-        @test unified_oracle isa UnifiedOracle
-        @test pareto_oracle isa ParetoOracle
+        unified_is_in_L, unified_cuts, unified_objectives = BendersX.generate_cuts(
+            unified_oracle,
+            [0.0],
+            [0.0],
+        )
+        @test !unified_is_in_L
+        @test length(unified_cuts) == 1
+        @test length(only(unified_cuts).a_x) == 1
+        @test length(only(unified_cuts).a_t) == 1
+        @test isinf(only(unified_objectives))
+
+        pareto_is_in_L, pareto_cuts, pareto_objectives = BendersX.generate_cuts(
+            pareto_oracle,
+            [0.0],
+            [0.0],
+        )
+        @test !pareto_is_in_L
+        @test length(pareto_cuts) == 1
+        @test length(only(pareto_cuts).a_x) == 1
+        @test length(only(pareto_cuts).a_t) == 1
+        @test isapprox(only(pareto_objectives), 2.0; atol = 1.0e-8)
 
         separable = SeparableOracle(master, [first_oracle])
         @test separable.dim_global_auxiliary == 1
@@ -179,29 +192,38 @@ struct IncompleteInterfaceMaster <: BendersX.AbstractMaster end
         )
         @test length(split.dcglp[:sx]) == 1
         @test length(split.dcglp[:st]) == 1
+    end
 
-        bnb = BendersBnB(
-            master,
-            first_oracle;
-            param = BendersBnBParam(verbose = false),
-        )
-        @test bnb.master === master
-        @test applicable(
-            BendersX.lazy_callback,
-            nothing,
-            master,
-            BendersX.BendersBnBLog(),
-            bnb.param,
-            bnb.lazy_callback,
-        )
-        @test applicable(
-            BendersX.user_callback,
-            nothing,
-            master,
-            BendersX.BendersBnBLog(),
-            bnb.param,
-            UserCallback(unified_oracle),
-        )
+    @testset "branch-and-bound environment uses the new master interface" begin
+        if MASTER_INTERFACE_CPLEX_AVAILABLE
+            master = renamed_field_master(; optimizer = CPLEX.Optimizer)
+            set_integer(only(BendersX.linking_variables(master)))
+            oracle = ClassicalOracle(
+                MasterInterfaceTestData(),
+                master;
+                model = build_master_interface_test_subproblem!,
+                param = ClassicalOracleParam(atol = 1.0e-8),
+                optimizer = GLPK.Optimizer,
+            )
+
+            bnb = BendersBnB(
+                master,
+                oracle;
+                param = BendersBnBParam(
+                    time_limit = 30.0,
+                    gap_tolerance = 1.0e-8,
+                    verbose = false,
+                ),
+            )
+            result = solve!(bnb)
+
+            @test bnb.termination_status isa Optimal
+            @test isapprox(bnb.obj_value, 2.0; atol = 1.0e-8)
+            @test only(result.n_lazy_cuts) >= 1
+            @test !isempty(result)
+        else
+            @test_skip "CPLEX is required for the BendersBnB integration test"
+        end
     end
 
     @testset "sequential environment delegates cut insertion" begin
